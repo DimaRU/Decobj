@@ -1,0 +1,730 @@
+.INCLUDE /DECDFN/
+.MODULE DECRLD,RELEASE=V09,VERSION=14,COMMENT=<ДЕКОДИРОВАНИЕ RLD - ЗАПИСЕЙ>
+
+
+.MACRO	GETWRD	REG
+	CLR	REG
+	BISB	(R1)+,REG
+	SWAB	REG
+	BISB	(R1)+,REG
+	SWAB	REG
+.ENDM	GETWRD
+............................................................
+;
+; ВЗЯТЬ СЛОВО TXT-БЛОКА
+;
+; ВОЗВРАЩЯЕТ:
+;
+; ЕСЛИ 'C' - УСТАНОВЛЕН (НЕВОЗМОЖНО ВЗЯТЬ СЛОВО):
+;	R0 = -1 - BUGS, ОТСТОЯНИЕ TXT
+;	R0 =  1 - МОДИФИКАЦИЯ BYTE, 1-Й БАЙТ
+;	R0 =  2 - МОДИФИКАЦИЯ BYTE, 2-Й БАЙТ
+; ПРИ СБОШЕННОМ 'C'
+;	R0 = -1 - СЛОВО НЕ МОДИФИЦИРОВАНО
+;	R0 =  0 - СЛОВО МОДИФИЦИРОВАНО
+; В R1 - АДРЕС СЛЕД. СЛОВА В БУФЕРЕ TXT
+; В CURWB, R3 - ТЕКУЩЕЕ СЛОВО
+;
+............................................................
+GETWRD::
+	BIT	#1,CURLC
+	BNE	5$		; НЕВОЗМОЖНО СЧИТАТЬ СЛОВО - БАЙТОВАЯ ГР.
+	MOV	MODCMD,R0	; СПИСОК ОСНОВНЫХ КОМАНД
+	BEQ	7$		; ПУСТОЙ
+	MOV	NXTLC,R3	; ВЫЧИСЛИМ ДЛИНУ ТЕК. СТРОКИ
+	SUB	CURLC,R3	; 
+	INC	R3		; +1 - ПРОВЕРИМ СТАРШИЙ БАЙТ
+	BEQ	7$		; ???
+	ADD	CMDLCN,R3	; ВЕРХНЕЕ LCN
+	CMP	C$LCN(R0),R3	; ЕСТЬ КОМАНДА НА ТЕК. СЛОВЕ?
+	BLOS	5$		;
+7$:	MOV	TX.EAD,R0	; ВЫЧИСЛИМ, СКОЛЬКО БАЙТОВ
+	SUB	NXTLC,R0	;  ОСТАЛОСЬ ДО КОНЦА TXT-БЛОКА
+	DEC	R0
+	BGT	1$		; БОЛЬШЕ ОДНОГО БАЙТА
+	BEQ	5$		; ОДИН БАЙТ - НЕЛЬЗЯ СЧИТАТЬ СЛОВО
+	TST	BUGS		; НЕЛЬЗЯ СЧИТАТЬ TXT?
+	BNE	5$		; ДА
+	CALL	GETTXT		; СЧИТАТЬ TXT-БЛОК
+;	INC	GTFLG		; ПРОИЗВЕДЕНО СЧИТЫВАНИЕ ВНУТРИ КОМАНДЫ
+;	CMP	TX.ADR,NXTLC
+;	BNE	5$		; ОТСТОЯНИЕ TXT-БЛОКА
+1$:	CALL	CHKREL		; ПРОВЕРИМ НА МОДИФИКАЦИЮ
+	BGT	6$		; БАЙТОВАЯ
+	MOV	R0,R1
+	MOV	RL.POS,-(SP)
+	INC	NXTLC		; ПРОВЕРИМ НА МОДИФИКАЦИЮ СТАРШИЙ БАЙТ
+	CALL	CHKREL		; МОДИФ. СЛЕД. БАЙТ?
+	DEC	NXTLC
+	MOV	(SP)+,RL.POS
+	TST	R0
+	BMI	2$
+	INC	R0		; БАЙТОВАЯ МОДИФИКАЦИЯ - НЕ ДОПУСТИМО
+	BR	6$
+2$:	MOV	R1,R0
+	MOV	#CURWB,R3
+	MOV	NXTLC,R1	; ВЫЧИСЛИМ ПОЗИЦИЮ В TXTLIN
+	SUB	TX.ADR,R1
+	ADD	TX.BEG,R1
+	MOVB	(R1)+,(R3)+
+	MOVB	(R1)+,(R3)+
+	MOV	-(R3),R3
+	ADD	#2,NXTLC	; ПРОДВИНУТЬ NXTLC
+	CMP	L.R.PNT,#LINREL+2
+	BHIS	4$
+	MOV	R3,@L.B.PNT
+	ADD	#2,L.B.PNT
+	INC	L.R.PNT
+4$:	TST	R0
+	RETURN
+5$:	MOV	#-1,R0
+6$:	TST	R0
+	SEC
+	RETURN
+;
+; ВЗЯТЬ БАЙТ TXT-БЛОКА
+;
+; ВОЗВРАЩЯЕТ:
+;
+; ЕСЛИ 'C' - УСТАНОВЛЕН (НЕВОЗМОЖНО ВЗЯТЬ БАЙТ):
+;	R0 = -1 - BUGS, ОТСТОЯНИЕ TXT, КОМАНДА ПО ДАННОМУ АДРЕСУ
+;	R0 =  0 - СЛОВНАЯ МОДИФИКАЦИЯ ПО ДАННОМУ АДРЕСУ
+; ПРИ СБОШЕННОМ 'C'
+;	R0 = -1 - БАЙТ НЕ МОДИФИЦИРОВАН
+;	R0 =  1 - БАЙТ МОДИФИЦИРОВАН
+; В R1 - АДРЕС СЛЕД. БАЙТА В БУФЕРЕ TXT
+; В CURWB, R3 - ТЕКУЩИЙ БАЙТ
+;
+GETBYT::
+	MOV	MODCMD,R0
+	BEQ	7$
+	MOV	NXTLC,R3
+	SUB	CURLC,R3
+	BEQ	7$
+	ADD	CMDLCN,R3
+	CMP	C$LCN(R0),R3
+	BEQ	4$		; ПО ЭТОМУ АДРЕСУ ЗАПИСАНА КОМАНДА
+7$:	MOV	TX.EAD,R0	; ВЫЧИСЛИМ, СКОЛЬКО БАЙТОВ
+	SUB	NXTLC,R0	;  ОСТАЛОСЬ ДО КОНЦА TXT-БЛОКА
+	BNE	1$		; НИЧЕГО НЕ ОСТАЛОСЬ
+	TST	BUGS		; НЕЛЬЗЯ СЧИТАТЬ TXT?
+	BNE	4$		; ДА
+	CALL	GETTXT		; СЧИТАТЬ TXT-БЛОК
+;	INC	GTFLG		; ПРОИЗВЕДЕНО СЧИТЫВАНИЕ ВНУТРИ КОМАНДЫ
+;	CMP	TX.ADR,NXTLC
+;	BNE	4$		; ОТСТОЯНИЕ TXT-БЛОКА
+1$:	CALL	CHKREL		; МОДИФИЦИРОВАНО?
+	BEQ	5$		; СЛОВНАЯ МОДИФИКАЦИЯ
+	MOV	NXTLC,R1
+	SUB	TX.ADR,R1
+	ADD	TX.BEG,R1
+	MOVB	(R1)+,R3
+	BIC	#^C377,R3
+	MOV	R3,CURWB
+	INC	NXTLC
+	CMP	L.R.PNT,#LINREL+5
+	BHIS	3$
+	MOVB	R3,@L.B.PNT
+	INC	L.B.PNT
+	INC	L.R.PNT
+3$:	TST	R0
+	RETURN
+4$:	MOV	#-1,R0
+5$:	TST	R0
+	SEC
+	RETURN
+............................................................
+;
+; ПОИСК LC MOD (10) И LC DEF (7) В RLDLIN
+;
+............................................................
+CKLCPS:
+	JSR	R1,$SAVЕ3	; СОХР. 1-3
+	MOV	RLDLIN,R1
+	CMP	(R1)+,#4	; RLD?
+	BNE	4$		; НЕТ
+
+1$:	CMP	R1,RLDEND	; КОНЕЦ СТРОКИ?
+	BHIS	4$		; ДА,ЗАКОНЧИТЬ
+	MOVB	(R1),R3 	; ВЗЯТЬ ТИП RLD
+	BIC	#177600,R3
+	CMP	R3,#7		; LC DEFINITION?
+	BNE	2$
+	CALL	RLDPS		; ОБРАБОТАТЬ LC DEFINITION
+	BR	3$
+2$:	CMP	R3,#10		; LC MODIFICATION?
+	BNE	3$		; ДРУГИЕ КОМАНДЫ ОБРАБАТЫВАТЬ ПОЗЖЕ
+	CALL	RLDLC		; ОБРАБОТАТЬ LC MODIFICATION
+3$:	CALL	INCREL		; НА СЛЕД. КОМАНДУ RLD
+	BR	1$		; ПОВТОРИТЬ
+4$:	RETURN
+............................................................
+;
+;   ОБРАБОТКА LC MOD (10)
+; НА ВХОДЕ: R1 УКАЗЫВАЕТ НА RLD ENTRY
+;
+............................................................
+RLDLC:
+	MOV	2(R1),R0	; УСТАНОВИТЬ НОВЫЙ LC
+	CALLR	MODLC		; МОДИФИЦИРОВАТЬ LC
+............................................................
+;
+; ОБРАБОТКА PSECT DEF (RLD TYPE 7)
+; НА ВХОДЕ R1 УКАЗЫВАЕТ НА ЗАПИСЬ RLD
+;
+............................................................
+RLDPS:
+	MOV	R1,-(SP)
+	TST	(R1)+
+	MOV	R1,R0
+	CALL	GETPS		; НАЙТИ НОМЕР СЕКЦИИ
+	MOV	R0,CURPS	; УСТАНОВИТЬ НОВЫЙ ТЕКЩИЙ НОМЕР СЕКЦИИ
+	MOV	R0,R4
+	MOV	#CURLIN,R2
+	MOVB	#200,(R2)+
+	CALL	OUT$LIN 	; ВЫДЕЛИТЬ ПУСТОЙ СТРОКОЙ
+	CALL	PUTPS		; ВЫВЕСТИ '.PSECT XXXX'
+	ASL	R4
+	MOV	4(R1),R0	; LC ЗАГРУЗКИ СЕКЦИИ
+	TST	BRKFLG		; НАХОДИМСЯ В ДИАЛОГЕ?
+	BEQ	2$		; НЕТ
+	MOV	R0,PSLC(R4)	; УСТАНОВИТЬ ТЕК. LC (МОЖЕТ БЫТЬ ВОЗВРАТ)
+2$:	MOV	PSLC(R4),CURLC
+	CMP	R0,CURLC	; АДРЕС ЗАГРУЗКИ СЕКЦИИ ОТЛИЧАЕТСЯ ОТ ТЕК.?
+	BEQ	1$		; НЕТ
+	CALL	MODLC		; МОДИФИКАЦИЯ LC - .BLKW
+1$:	MOV	(SP)+,R1	; ВОССТ. РЕГИСТР
+	RETURN
+............................................................
+;
+; INCREL - ПРОДВИНУТЬ RLD НА СЛЕД. ENTRY
+; НА ВХОДЕ: R1 - УКАЗАТЕЛЬ НА ЗАПИСЬ RLD
+;	    R3 - ТИП RLD
+;
+............................................................
+INCREL:
+	CMP	R3,#17		; COMPLEX RELOCATION?
+	BEQ	1$		; ДА, ОБРАБАТЫВАТЬ ОСОБО
+	MOVB	INCRLD-1(R3),R3	; ДЛИНА ЭЛЕМЕНТА
+	ADD	R3,R1		; ПРОДВИНУТЬ УКАЗАТЕЛЬ
+	RETURN			; КОНЕЦ
+
+1$:	ADD	#2,R1		; ПРОДВИНУТЬСЯ ЗА RLD TYPE И DISP
+2$:	MOVB	(R1)+,R3	; ПРОДВИНУТЬСЯ НА ОПЕРАТОР
+	CMP	R3,#12		; TERMINATOR?
+	BEQ	3$		; ДА - КОНЕЦ
+	BLT	2$		; НЕТ - НА СЛЕД. ОПЕРАТОР
+	CMP	R3,#13		; TERMINATOR?
+	BEQ	3$		; ДА - КОНЕЦ
+	CMP	R3,#21		; FETCH RESLIB BASE ADDRESS?
+	BEQ	2$		; ДА - СЛЕД. ОПЕРАТОР
+	NEG	R3		; FETCH TYPE COMMAND - 16-20
+	ADD	#22,R3		; ПРЕОБР. К ЗНАЧЕНИЮ 2-4
+	ADD	R3,R1		; УКАЗ. НА СЛЕД. ОПЕРАТОР
+	BR	2$		; СЛЕД. ОПЕРАТОР
+3$:	RETURN
+............................................................
+;
+; MODLC - ВЫВЕСТИ СТРОКУ МОДИФИКАЦИИ LC
+;	.=.-NNNN ЕСЛИ NNNN ОТРИЦАТЕЛЬНО
+;	.BLKB NNNN ЕСЛИ NNNN ПОЛОЖИТЕЛЬНО
+; НА ВХОДЕ:    R0 СОДЕРЖИТ NXTLC
+;
+............................................................
+MODLC::
+	MOV	R1,-(SP)	; СОХР. R1
+	CALL	BEGLIN
+	MOV	R0,NXTLC	; СФОРМИРОВАТЬ NXTLC
+	MOV	CURPS,R1
+	ASL	R1
+	MOV	R0,PSLC(R1)	; СОХРАНИТЬ НОВОЕ LC
+	SUB	CURLC,R0	; СМЕЩЕНИЕ
+	BLE	1$		; ОТРИЦАТЕЛЬНОЕ СМЕЩЕНИЕ
+	MOV	R0,R1
+	MOV	#BLTXT,R0
+	CALL	MOVTXT		; ДАННЫЕ - ИСПОЛЬЗ. '.BLKB'
+	MOV	R1,R0		; ВОССТ. R0
+	INC	BLKB1
+	BR	4$		; ВЫВЕСТИ ЗНАЧЕНИЕ
+1$:	MOV	#".=,(R2)+	; ИНСТРУКЦИЯ
+	TST	R0		; ИСПОЛЬЗОВАТЬ '.=.+NNNN'
+	BMI	2$
+	MOV	#".+,(R2)+
+	TST	R0
+	BEQ	3$
+	BR	4$
+2$:	MOV	#".-,(R2)+
+	NEG	R0
+3$:	CALL	OCONV
+	CALL	MOVTXT
+	CALL	OUT$LIN
+	BIT	#L.REP,PARSWT	; ПОВТОРЯТЬ МЕТКИ ПРИ ТЕХ ЖЕ АДРЕСАХ?
+	BEQ	5$		; НЕТ
+	MOV	CURPS,R1
+	ASL	R1
+	MOV	GLBPNT(R1),GLBPN1(R1)	; УСТАНОВИТЬ УКАЗАТЕЛИ МЕТОК НА НАЧАЛО
+	MOV	LSPNT(R1),LSPN1(R1)
+	MOV	LLPNT(R1),LLPN1(R1)
+	BR	5$
+4$:	CALL	OCONV		; ПРЕОБРАЗОВАТЬ В ASCII
+	CALL	MOVTXT
+	CALL	PUT$LIN 	; ВЫВЕСТИ СТРОКУ
+5$:	MOV	(SP)+,R1
+	MOV	NXTLC,CURLC	; НОВОЕ CURLC
+	RETURN
+............................................................
+;
+; GETTXT - ЗАПИСЬ TXT КОНЧИЛАСЬ - СЧИТАТЬ СЛЕД.
+;
+............................................................
+.ENABL	LSB
+GETTXT::
+	JSR	R1,$SAVE3
+	MOV	RLDLIN,R3
+	TST	@R3
+	BNE	20$		; НЕПУСТОЙ БУФЕР
+	CALL	RD$LIN		; СЧИТАТЬ NXT
+	CMP	@R1,#6 		; EOM?
+	BNE	21$		; КОНЕЦ
+	JMP	99$
+21$:	MOV	#NXTPOS,R0
+	MOV	#RLDPOS,R1	; ПЕРЕСЛАТЬ СТРОКУ NXT В RLD
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	R3,NXTLIN	; АДРЕС NXTLIN
+	CALL	RD$LIN		; СЧИТАТЬ СТРОКУ NXT
+	MOV	RLDLIN,R3
+20$:	CMP	@R3,#6 		; EOM?
+	BEQ	99$		; КОНЕЦ
+	CMP	@R3,#3 		; TXT?
+	BNE	NEWRLD		; НЕТ
+
+RCV:	MOV	TXTLIN,R3
+	MOV	#RLDPOS,R0
+	MOV	#TXTPOS,R1
+	MOV	(R0)+,(R1)+	; ПЕРЕСЛАТЬ СТРОКУ RLD В СТРОКУ TXT
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+	; ПЕРЕСЛАТЬ СТРОКУ NXT В СТРОКУ RLD
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	R3,NXTLIN	; УСТАНОВИТЬ АДРЕС СТРОКИ NXT
+	CMP	@RLDLIN,#6	; ДОСТИГЛИ EOM?
+	BEQ	SETBUF		; ДА, НЕ НАДО СЧИТЫВАТЬ NXT
+	CALL	RD$LIN		; СЧИТАТЬ СТРОКУ 3
+SETBUF:
+	MOV	RLDEND,R1
+	SUB	RLDLIN,R1
+	MOV	TXTLIN,R1
+	TST	(R1)+
+	MOV	@R1,TX.ADR	; АДРЕС ЗАГРУЗКИ
+	MOV	(R1)+,TX.EAD
+	MOV	R1,TX.BEG
+	SUB	R1,TX.EAD
+	ADD	TXTEND,TX.EAD
+	CLR	BUGS
+	MOV	RLDLIN,R1
+	CMP	@R1,#6		; EOM?
+	BEQ	8$		; BUGS, ВЫХОД
+	CMP	(R1)+,#4	; RLD?
+	BNE	5$		; НЕТ,НЕ НАДО ОБРАБАТЫВАТЬ TXT
+	MOV	R1,RL.POS
+
+2$:	MOVB	@R1,R3		; БАЙТ ТИПА ЗАПИСИ
+	BIC	#177600,R3	; СБРОСИТЬ ЛИШНИЕ БИТЫ
+	CMP	R3,#7		; PSECT DEF?
+	BEQ	8$		; ДА,BUGS
+	CMP	R3,#10		; LC DEF?
+	BEQ	8$		; ДА,BUGS
+4$:	CALL	INCREL		; ПРОДВИНУТЬСЯ НА ЗАПИСЬ RLD
+	CMP	R1,RLDEND
+	BLO	2$
+	MOV	NXTLIN,R1
+	CMP	(R1)+,#3	; TXT?
+	BNE	8$		; НЕТ,(RLD,EOM) - BUGS
+5$:	CMP	TX.EAD,@R1	; АДРЕСА РАЗЛИЧНЫ?
+	BEQ	9$		; НЕТ
+8$:	MOV	SP,BUGS		; УСТАНОВИТЬ ФЛАГ BUGS (ЗАПРЕЩ. СЧИТ. СЛЕД. TXT)
+9$:	MOV	#FWDPOS,R0
+	CALL	SV$POS		; ТЕК. ПОЗИЦИЯ В ФАЙЛЕ
+	CLC			; ВОЗВРАТ
+	RETURN
+
+NEWRLD:	CALL	CKLCPS		; ОБРАБОТАТЬ PS DEF И LC DEF
+	CMP	@NXTLIN,#6	; В NXTLIN - EOM
+	BEQ	99$
+	MOV	RLDLIN,R3
+	MOV	#NXTPOS,R0
+	MOV	#RLDPOS,R1	; ПЕРЕСЛАТЬ СТРОКУ NXT В RLD
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	R3,NXTLIN
+	CALL	RD$LIN		; СЧИТАТЬ СТРОКУ NXT
+	MOV	RLDLIN,R1
+	CMP	@R1,#3		; TXT?
+	BEQ	RCV		; ДА, ПЕРЕПИСАТЬ ЕГО В TXTLIN
+	CMP	@R1,#4		; RLD
+	BEQ	NEWRLD		; ОБРАБОТАТЬ СРАЗУ
+
+99$:	SEC			; ОБНАРУЖЕН EOM
+RET:	RETURN
+.DSABL	LSB
+;
+; RD$LIN - СЧИТАТЬ В NXTLIN СТРОКУ, ПРОПУСКАТЬ ВСЕ, КРОМЕ TXT,RLD,EOM
+;
+RD$LIN:
+	MOV	#NXTPOS,R0
+	CALL	SV$POS
+	CALL	RD$OBJ
+	MOV	NXTLIN,R1
+	CMP	(R1),#3 	; TXT?
+	BEQ	1$
+	CMP	(R1),#4 	; RLD?
+	BEQ	1$
+	CMP	(R1),#6 	; EOM?
+	BNE	RD$LIN
+1$:	RETURN
+............................................................
+; ПРОВЕРКА,МОДИФИЦ. ЛИ ДАННЫЙ АДРЕС
+; ВОЗВРАЩАЕТ :
+; -1 - НЕТ МОДИФИКАЦИИ
+;  0 - СЛОВНАЯ МОДИФ.
+;  1 - БАЙТОВАЯ МОДИФ.
+............................................................
+CHKREL::
+	MOV	R1,-(SP)
+	MOV	R3,-(SP)
+	MOV	RLDLIN,R1
+	CMP	(R1)+,#4	; RLD?
+	BNE	3$		; НЕТ
+	MOV	NXTLC,R0	; ВЫЧИСЛИТЬ СМЕЩЕНИЕ
+	SUB	TX.ADR,R0
+	ADD	#4,R0
+1$:	CMP	R1,RLDEND	; КОНЕЦ БЛОКА RLD?
+	BHIS	3$		; ДА
+	MOVB	@R1,R3		; БАЙТ ТИПА
+	CMPB	1(R1),R0	; СРАВНИМ СМЕЩЕНИЯ
+	BHI	3$		; БОЛЬШЕ - НЕ НАЙДЕНО
+	BEQ	2$		; НАЙДЕНО
+	BIC	#177600,R3	; СБРОСИМ ЛИШНИЕ БИТЫ
+	CALL	INCREL		; НА СЛЕД. ЭЛЕМЕНТ
+	BR	1$		; ПРОДОЛЖИМ ПОИСК
+2$:	MOV	R1,RL.POS	; ПРОДВИНЕМ RL.POS
+	CLR	R0
+	TST	R3
+	BPL	4$		; СЛОВНАЯ МОДИФИКАЦИЯ
+	INC	R0		; БАЙТОВАЯ МОДИФИКАЦИЯ
+	BR	4$
+3$:	MOV	#-1,R0		; ОБ'ЕКТ НЕ МОДИФ.
+4$:	MOV	(SP)+,R3
+	MOV	(SP)+,R1
+	TST	R0		; ВОЗВРАТИМ ПРИЗНАКИ
+	RETURN
+............................................................
+;
+; ОБРАБОТКА REL, НАЙДЕННОГО CHKREL
+;
+............................................................
+DECRLD::
+	MOV	R1,-(SP)
+	MOV	R3,-(SP)
+	MOV	RL.POS,R1	; ПОЗИЦИЯ В БЛОКЕ RLD
+	MOVB	(R1)+,R0	; БАЙТ ТИПА ЗАПИСИ
+	TSTB	(R1)+
+	BIC	#177600,R0	; СБРОСИТЬ ЛИШНИЕ БИТЫ В R3
+	ASL	R0		; ПОЛУЧИТЬ ИНДЕКС
+	MOVB	#'',@L.R.PNT	; ПОМЕТИТЬ, ЧТО НАШЛИ REL, В КОММЕНТАРИИ
+	CALL	@RLDTYP-2(R0)	; ОБРАБОТАТЬ ЗАПИСЬ
+	MOV	(SP)+,R3
+	MOV	(SP)+,R1
+	RETURN
+
+	.PSECT	DECDAT
+RLDTYP: .WORD	RLD1,RLD2,RLD3,RLD4,RLD5,RLD6,RLD7,RLD10
+	.WORD	RLD11,RLD12,RLD13,RLD14,RLD15,RLD16,RLD17,RLD20
+
+	.PSECT
+;
+; ОБРАБОТКА RLD - КОМАНД
+;
+RLD1:
+	GETWRD	R3
+	MOV	CURPS,R0
+	BR	RLDX
+RLD2:
+RLD4:
+	MOVB	#'G,@L.R.PNT	; ПОМЕТИТЬ ГЛОБАЛЬНЫЙ СИМВОЛ В КОММЕНТАРИИ
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2
+	CALL	SAVNAM
+	CALLR	DELSP
+RLD3:
+	GETWRD	R0
+	CALL	OCONV
+	CALLR	MOVTXT
+RLD7:				; PSECT DEFINITION - ВЫПОЛНЕНО РАНЬШЕ
+RLD10:				; LC MOD - ВЫПОЛНЕНО РАНЬШЕ
+RLD13:				; RLD TYPE 13 - НЕ ИСПОЛЬЗУЕТСЯ
+	RETURN
+RLD11:				; .LIMIT
+	CALL	BEGLIN		; ПЕРЕПИСАТЬ '.LIMIT'
+	MOV	#".L,(R2)+
+	MOV	#"IM,(R2)+
+	MOV	#"IT,(R2)+
+	ADD	#2,NXTLC	; ЗАНИМАЕТ 2 СЛОВА
+	ADD	#2,4(SP)	; 4(SP) - СОХР. R1 (НЕ ДЕКОД. СЛЕД. 0)
+	MOV	#"'',LINREL	; ДВА МОДИФИЦИРОВАННЫХ СЛОВА
+	CLR	LINBYT+2	; ДВА НУЛЯ
+	RETURN
+	.ENABL	LSB
+RLD5:
+RLD6:
+	CALL	RLD4		; ОБРАБОТАТЬ GLOBAL
+	GETWRD	R0
+	TST	R0
+	BEQ	3$
+	BLT	RLDM
+	MOVB	#'+,(R2)+
+	BR	1$
+RLDM:	MOVB	#'-,(R2)+
+	NEG	R0
+1$:	CALL	OCONV
+	CALL	MOVTXT
+3$:	RETURN
+	.DSABL	LSB
+RLD12:
+RLD14:
+	CLR	R3		; СМЕЩЕНИЕ = 0
+	BR	RLDP		; ОБРАБОТАТЬ КАК RLD ТИПА 15/16
+RLD15:
+RLD16:
+	CLR	R3
+	BISB	5(R1),R3
+	SWAB	R3
+	BISB	4(R1),R3
+RLDP:
+	MOV	R1,R0
+	CALL	GETPS		; ОПРЕДЕЛИТЬ НОМЕР СЕКЦИИ
+RLDX:
+	CALLR	PUTLSX		; ВЫВЕСТИ ЛОКАЛЬНЫЙ СИМВОЛ
+RLD20:
+	MOV	#RESBAS,R0
+	CALL	MOVTXT
+	MOVB	#'+,(R2)+
+	GETWRD	R0
+	CALL	OCONV
+	CALLR	MOVTXT
+
+............................................................
+;
+; COMPLEX RELOCATION
+;
+............................................................
+.ENABL	LSB
+RLD17:
+	MOVB	#'C,@L.R.PNT	; ПОМЕТИТЬ COMPLEX В КОММЕНТАРИИ
+	MOV	R4,-(SP)	; СОХРАНИТЬ R4
+	MOV	#CXSTK1,R4	; УСТАНОВИТЬ СТЕК 1
+1$:	MOVB	(R1)+,R0	; ВЗЯТЬ БАЙТ ОПЕРАТОРА
+	ASL	R0		; ПОЛУЧИМ ИНДЕКС
+	JMP	@CXOP(R0)	; ОБРАБОТАЕМ ОПЕРАТОР
+CX0:
+	BR	1$		; NOP
+CX1:
+	CLR	(R4)+		; 0 - ПРИЗНАК ОПЕРАТОР
+	MOV	#'+,(R4)+	; ИМЯ ОПЕРАТОРА
+2$:	MOV	#2,(R4)+	; КОЛИЧЕСТВО ОПЕРАНДОВ
+	BR	1$
+CX2:
+	CLR	(R4)+		; ВЫЧИТАНИЕ
+	MOV	#'-,(R4)+
+	BR	2$
+CX3:
+	CLR	(R4)+		; УМНОЖЕНИЕ
+	MOV	#'*,(R4)+
+	BR	2$
+CX4:
+	CLR	(R4)+		; ДЕЛЕНИЕ
+	MOV	#'/,(R4)+
+	BR	2$
+CX5:
+	CLR	(R4)+		; ЛОГИЧЕСКОЕ 'И'
+	MOV	#'&,(R4)+
+	BR	2$
+CX6:
+	CLR	(R4)+		; ЛОГИЧЕСКОЕ 'ИЛИ'
+	MOV	#'!,(R4)+
+	BR	2$
+CX10:
+	CLR	(R4)+		; ОТРИЦАНИЕ ОПЕРАНДА
+	MOV	#'-,(R4)+
+3$:	MOV	#1,(R4)+	; ТОЛЬКО ОДИН ОПЕРАНД
+	BR	1$
+CX11:
+	CLR	(R4)+		; ДОПОЛНЕНИЕ
+	MOV	#"^C,(R4)+
+	BR	3$
+CX12:
+CX13:
+	BR	9$		; КОНЕЦ COMPLEX
+CX16:
+	MOV	R4,R0		; ПРЕОБРАЗОВАТЬ ИМЯ В ASCII
+	CALL	R50ASC
+	MOV	R0,R4
+	CALL	SAVNAM		; СОХРАНИТЬ ИМЯ ССЫЛКИ НА ГЛОБАЛЬНЫЙ СИМВОЛ
+	BR	1$
+CX17:
+	MOVB	(R1)+,R0	; ВЗЯТЬ НОМЕР СЕКЦИИ
+	INC	R0		; НУМЕРОВАТЬ,НАЧИНАЯ С 1
+	GETWRD	R3
+	MOV	R2,-(SP)
+	MOV	R4,R2
+	CALL	PUTLS		; СДЕЛАТЬ МЕТКУ
+	ADD	#6.,R4
+4$:	CMP	R2,R4
+	BHIS	5$
+	MOVB	#40,(R2)+
+	BR	4$
+5$:	MOV	(SP)+,R2
+	BR	1$
+CX20:
+	GETWRD	R0
+	CALL	OCONV		; ЦИФРОВОЙ ОПЕРАНД - ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	#7,R3
+6$:	DEC	R3
+	MOVB	(R0)+,(R4)+	; ПЕРЕПИСАТЬ В 1-Й СТЕК
+	BNE	6$
+	TSTB	-(R4)
+	TST	R3
+	BEQ	1$
+7$:	MOVB	#40,(R4)+	; ДОПИСАТЬ ОСТАВШЕЕСЯ ПРОБЕЛАМИ (ДО 6 СИМВ.)
+	SOB	R3,7$
+	BR	1$
+CX21:
+	MOV	#RESBAS,R0
+8$:	MOVB	(R0)+,(R4)+
+	BNE	8$
+	DEC	R4
+	BR	1$
+9$:
+	MOV	#1,-(SP)	; ПЕРЕПИСЫВАТЬ 1 ОПЕРАНД В ОБРАТНОМ ПОРЯДКЕ
+	MOV	#CXSTK2,R5	; СТЕК 2
+	CALL	REVSTK		; РЕВЕРСИРОВАТЬ СТЕК
+	TST	(SP)+		; ОПУСТИТЬ ПАРАМЕТР
+	CALL	PRTITM		; ВЫВЕСТИ COMPLEX
+	MOV	(SP)+,R4	; ВОССТАНОВИТЬ R4
+	RETURN
+.DSABL	LSB
+
+	.PSECT	DECDAT,D
+CXOP:	.WORD	CX0,CX1,CX2,CX3,CX4,CX5,CX6,CX0
+	.WORD	CX10,CX11,CX12,CX13,CX0,CX0,CX16,CX17,CX20,CX21
+CXSTK1: .BLKB	20.*6
+CXSTK2: .BLKB	20.*6
+
+	.PSECT
+;
+; REVSTK - КОПИРОВАТЬ СТЕК 1 В СТЕК 2, ПРЕОБРАЗОВЫВАЯ
+;	   ОБРАТНУЮ ЗАПИСЬ В ПРЯМУЮ
+; R4 -> СТЕК 1, R5 -> СТЕК 2
+;
+REVSTK:
+	MOV	-(R4),-(SP)	; ПЕРЕПИСАТЬ ИЗ СТЕКА 1
+	MOV	-(R4),-(SP)
+	MOV	-(R4),-(SP)
+	BNE	1$		; ЕСЛИ ОПЕРАТОР, ПЕРЕЙТИ К ПЕРЕПИСИ
+	MOV	4(SP),-(SP)	; ОПЕРАТОР - ВЗЯТЬ ЧИСЛО ОПЕРАНДОВ
+	CALL	REVSTK		; ПЕРЕПИСАТЬ СНАЧАЛА ОПЕРАНДЫ
+	TST	(SP)+		; РАЗГРУЗИТЬ СТЕК
+1$:	MOV	(SP)+,(R5)+	; КОПИРУЕМ ЭЛЕМЕНТ
+	MOV	(SP)+,(R5)+
+	MOV	(SP)+,(R5)+
+	DEC	2(SP)		; УМЕНЬШИМ СЧЕТЧИК ОПЕРАНДОВ
+	BGT	REVSTK		; ЕЩЕ ЕСТЬ ОПЕРАНДЫ
+	RETURN
+;
+; PRTITM - ВЫВЕСТИ СТРОКУ ИЗ СТЕКА 2
+; R5 -> СТЕК 2, R2-> ВЫХОДНАЯ СТРОКА
+;
+PRTITM:
+	MOV	-(R5),-(SP)	; ВЗЯТЬ ЭЛЕМЕНТ ИЗ СТЕКА 2
+	MOV	-(R5),-(SP)
+	MOV	-(R5),-(SP)
+	BEQ	3$		; ЕСЛИ ОПЕРАТОР
+	MOV	#6,R0		; ОПЕРАНД - ВЫВЕСТИ ЕГО
+	MOV	SP,R4
+1$:	MOVB	(R4)+,(R2)+
+	SOB	R0,1$
+	CALL	DELSP		; УДАЛИТЬ ЛИШНИЕ ПРОБЕЛЫ
+	ADD	#6,SP
+	BR	6$		; ЗАКОНЧИТЬ
+3$:
+	CMP	4(SP),#2	; ОПЕРАТОР - СКОЛЬКО ОПЕРАНДОВ?
+	BNE	4$		; ОДИН ОПЕРАНД
+	MOVB	#'<,(R2)+	; 2 ОПЕРАНДА
+	CALL	PRTITM		; ВЫВЕСТИ ПЕРВЫЙ ОПЕРАНД
+	TST	(SP)+
+	MOVB	(SP)+,(R2)+	; ВЫВЕСТИ ОПЕРАТОР
+	TST	(SP)+
+	CALL	PRTITM		; ВЫВЕСТИ ВТОРОЙ ОПЕРАНД
+	MOVB	#'>,(R2)+
+	BR	6$		; КОНЕЦ
+4$:
+	TST	(SP)+		; 1 ОПЕРАНД
+	MOVB	(SP),(R2)+	; ВЫВЕСТИ ОПЕРАТОР
+	TSTB	1(SP)		; ЕСТЬ ЕЩЕ ОДИН БАЙТ
+	BEQ	5$		; НЕТ
+	MOVB	1(SP),(R2)+
+5$:	CMP	(SP)+,(SP)+
+	CALL	PRTITM		; ВЫВЕСТИ ОПЕРАНД
+6$:
+	RETURN
+;
+; НАЙТИ НОМЕР СЕКЦИИ
+; НА ВХОДЕ : R0 -> ИМЯ PSECT
+; НА ВЫХОДЕ : R0 = НОМЕР PSECT
+;
+GETPS::
+	JSR	R1,$SAVЕ3
+	MOV	PSECTS,R1
+	MOV	#PSNAME,R2
+1$:	MOV	#4,R3
+2$:	CMPB	(R0)+,(R2)+
+	BNE	3$
+	SOB	R3,2$
+	BR	5$
+3$:	SUB	#5.,R3
+	ADD	R3,R0
+	ADD	R3,R2
+4$:	ADD	#4.,R2
+	SOB	R1,1$
+5$:	MOV	PSECTS,R0
+	INC	R0
+	SUB	R1,R0
+	RETURN
+..............................................................................
+;
+; СОХРАНЕНИЕ ИМЕНИ GLOBAL - СИМВОЛА ДЛЯ ПОИСКА ССЫЛОК ( ПРОДВИГАЕТ R1!)
+;
+..............................................................................
+SAVNAM:
+	MOV	NAM.PNT,R0
+	CMP	R0,LABNAM+40.
+	BHIS	1$
+	MOVB	(R1)+,(R0)+
+	MOVB	(R1)+,(R0)+
+	MOVB	(R1)+,(R0)+
+	MOVB	(R1)+,(R0)+
+	MOV	R0,NAM.PNT
+	RETURN
+1$:	ADD	#4,R1
+	RETURN
+
+	.END

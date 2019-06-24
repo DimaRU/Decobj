@@ -1,0 +1,96 @@
+.INCLUDE /DECDFN/
+.MODULE DECSHO,RELEASE=V09,VERSION=1,COMMENT=<ОБРАБОТКА КОМАНДЫ SHOW>
+
+
+SHOW::
+	MOV	#CMDBUF,R5
+	TSTB	C$NUM(R5)
+	BEQ	FRMEM		; ПО УМОЛЧАНИЮ - СВОБОДНАЯ ПАМЯТЬ
+	MOV	C$PARM(R5),R0
+	CMP	R0,#MAX.SH
+	BHI	ERRSYN
+	SUB	#SH.BAS,R0
+	BLT	ERRSYN
+	ASL	R0
+	CALLR	@SHOSUB(R0)
+ERRSYN:	ERROR	E.SNTX
+	RETURN
+
+	.PSECT	DECDAT,D
+SHOSUB:
+	.WORD	BASE
+	.WORD	PSECT
+	.WORD	FRMEM
+
+	.PSECT
+BASE:
+PSECT:
+	MOV	#1,R4		; НОМЕР СЕКЦИИ
+REP:	MOV	R4,R3
+	ASL	R3
+
+	MOV	#CURLIN,R2
+	MOV	#"  ,(R2)+
+	CMP	R4,CURPS
+	BNE	1$
+	MOVB	#'*,CURLIN	; ПОМЕТИМ ТЕК. СЕКЦИЮ *
+1$:	MOV	#PSTXT,R0
+	CALL	MOVTXT
+	MOV	R3,R1
+	ASL	R1
+	ADD	#PSNAME-4,R1
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII ИМЯ СЕКЦИИ
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+
+	MOVB	#',,(R2)+
+	MOVB	#'I,(R2)+
+	CMP	INICMD(R3),#DC.WRD
+	BNE	2$
+	MOVB	#'D,-1(R2)
+2$:	MOVB	#11,(R2)+
+	MOVB	#';,(R2)+
+	MOVB	#' ,(R2)+
+	MOV	PSLEN(R3),R0	; ДЛИНА
+	CALL	OCONV		; ПРЕОБРАЗОВАТЬ
+	CALL	MOVTXT
+	MOVB	#11,(R2)+
+	MOV	R4,R0		; НОМЕР
+	CALL	OCONV
+	CALL	MOVTXT
+	MOVB	#'(,(R2)+
+	MOVB	R4,@R2
+	BISB	#100,(R2)+
+	MOV	#LCTXT,R0
+	CALL	MOVTXT
+	MOV	PSLC(R3),R0
+	CMP	R4,CURPS
+	BNE	3$
+	MOV	CURLC,R0
+3$:	CALL	OCONV
+	CALL	MOVTXT
+	CALL	WR$LIN
+	INC	R4
+	CMP	R4,PSECTS
+	BLE	REP
+	RETURN
+
+............................................................
+;
+; РАСПЕЧАТКА СВОБОДНОЙ ПАМЯТИ
+;
+............................................................
+FRMEM::
+	MOV	#CURLIN,R2
+	MOV	#MS.MEM,R0
+	CALL	MOVTXT
+	MOV	HICORE,R0
+	SUB	CURMEM,R0
+	CALL	DCONV
+	CALL	MOVTXT
+	CALLR	WR$LIN
+
+	.PSECT	DECTXT,D,RO
+LCTXT:	.ASCIZ	/)/<11>/LC=/
+
+	.END

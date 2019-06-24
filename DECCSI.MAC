@@ -1,0 +1,402 @@
+.INCLUDE /DECDFN/
+.MODULE DECCSI,RELEASE=V09,VERSION=16,COMMENT=<ОБРАБОТКА CSI>
+
+.REM	\
+ВЫЗОВ:
+	.R DEC
+	*[OUTSPC]![DIASPC]=INSPC,DIASPC/SWITCHES	! STANDART CSI FORMAT
+ИЛИ
+	.DEC INSPC,DIASPC [OUTSPC]![DIASPC]/SWITCHES ! CCL FORMAT
+(ФАЙЛ DEC.SAV ДОЛЖЕН НАХОДИТЬСЯ НА SY: )
+ИЛИ
+	.DEC INSPC/SWITCHES
+(ВЫВОД БУДЕТ НАПРАВЛЕН НА ТЕРМИНАЛ)
+
+РАСШИРЕНИЕ ПО УМОЛЧАНИЮ ДЛЯ ВХОДНОГО ФАЙЛА : .OBJ
+РАСШИРЕНИЕ ПО УМОЛЧАНИЮ ДЛЯ КОМАНДНОГО ФАЙЛА : .DIA
+РАСШИРЕНИЕ ПО УМОЛЧАНИЮ ДЛЯ ВЫХОДНОГО ФАЙЛА : .MAC
+ЕСЛИ УКАЗАН ТОЛЬКО ВХОДНОЙ ФАЙЛ , ТО ВЫВОД БУДЕТ НАПРАВЛЕН НА ТЕРМИНАЛ
+(С ПОМ. .PRINT)
+    НАПРИМЕР
+	*SY:ODT
+КАНАЛ ВЫХОДНОГО ФАЙЛА - 0
+КАНАЛ КОМАНДНОГО ФАЙЛА - 1
+КАНАЛ ВХОДНОГО ФАЙЛА  - 3
+
+   ЕСЛИ ВХОДНОЙ ФАЙЛ - БИБЛИОТЕКА, ТО DECOBJ ВЫДАЕТ ПОДСКАЗКУ
+	GLOBAL?
+И ИЩЕТ МОДУЛЬ С ЭТИМ ИМЕНЕМ В БИБЛИОТЕКЕ
+
+КЛЮЧИ:	СМ. DEC.HLP
+\
+
+.MCALL	.READW	.WRITW	.GTLIN	.PRINT	.WAIT	.ENTER	.HERR	.SCCA
+.MCALL	.CSISPC	.SETTOP	.RCTRLO	.SRESET	.FETCH	.LOOKUP	.SERR
+
+	.PSECT	DECDAT,D
+STKSAV: .BLKW	1	; ДЛЯ СОХР. СТЕКА
+DISSWT:	.BLKW	1	; БИТЫ ЗАПРЕЩЕНИЯ PARSWT
+MODNAM::.BLKW	6	; ИМЯ БИБЛ. МОДУЛЯ В ASCII
+AREA::	.BLKW	10.
+TERM:	.BLKW	1
+FILFLG:	.WORD	0
+OUTSPC:	.BLKW	5*3
+INSPC1:	.BLKW	4
+INSPC2:	.BLKW	4*5
+EXT:	.WORD	-1,-1,-1,-1	;РАСШИРЕНИЯ ПО УМОЛЧ. ДЛЯ CSISPC
+FILEXT:	.RAD50	/MAC      OBJDIA/
+
+HILIM=:.+2
+	.LIMIT
+
+; ТАБЛИЦЫ ЗНАЧЕНИЙ КЛЮЧЕЙ ДЛЯ DECOBJ
+
+.MACRO	SWVAL	NAME,MASK
+	.RAD50	/NAME/
+	.WORD	MASK
+.ENDM	SWVAL
+
+.MACRO	TABLE	SWVTBL	NAME	DEFAULT
+SWVTBL:
+	.WORD	0	; ФЛАГ
+	.WORD	NAME	; КУДА ВЫСТАВЛЯТЬ БИТЫ
+	.RAD50	/DEFAULT/
+.ENDM	TABLE
+
+.MACRO	ENDTAB
+	.WORD	0
+.ENDM	ENDTAB
+
+TABLE	PARTBL	PARSWT	<FUL>
+
+SWVAL	<ODD>	L.ODD
+SWVAL	<CAL>	L.CAL
+SWVAL	<DLL>	L.DLL
+SWVAL	<RLL>	L.RLL
+SWVAL	<RLS>	L.RLS
+SWVAL	<SIG>	L.SIG
+SWVAL	<SHR>	L.SHR
+SWVAL	<ABS>	L.ABS
+SWVAL	<PSE>	L.PSE
+SWVAL	<ASB>	L.ASB
+SWVAL	<BLL>	L.BLL
+SWVAL	<NUM>	L.NUM
+SWVAL	<LOC>	L.LOC
+SWVAL	<GBL>	L.GBL
+SWVAL	<REP>	L.REP
+SWVAL	<BI8>	L.BI8
+SWVAL	<FUL>	L.ODD!L.CAL!L.RLL!L.RLS!L.BLL!L.SIG!L.NUM!L.GBL ; ЧИСТОЕ
+SWVAL	<MAC>	L.ODD!L.CAL!L.RLL!L.RLS!L.BLL!L.SIG!L.NUM!L.GBL!L.LOC
+SWVAL	<CLN>	L.ODD!L.CAL!L.RLL!L.RLS!L.BLL!L.SIG!L.GBL
+	ENDTAB
+
+TABLE	DISTBL	DISSWT	<ALL>
+
+SWVAL	<ODD>	L.ODD
+SWVAL	<CAL>	L.CAL
+SWVAL	<DLL>	L.DLL
+SWVAL	<RLL>	L.RLL
+SWVAL	<RLS>	L.RLS
+SWVAL	<SHR>	L.SHR
+SWVAL	<SIG>	L.SIG
+SWVAL	<PSE>	L.PSE
+SWVAL	<BLL>	L.BLL
+SWVAL	<ASB>	L.ASB
+SWVAL	<NUM>	L.NUM
+SWVAL	<LOC>	L.LOC
+SWVAL	<ABS>	L.ABS
+SWVAL	<GBL>	L.GBL
+SWVAL	<REP>	L.REP
+SWVAL	<BI8>	L.BI8
+SWVAL	<ALL>	-1
+SWVAL	<CLN>	L.ODD!L.CAL!L.RLL!L.RLS!L.BLL!L.SIG!L.GBL
+	ENDTAB
+
+TABLE	COMTBL	COMSWT	<ALL>
+
+SWVAL	<LC>	C.LC
+SWVAL	<WRD>	C.WRD
+SWVAL	<ASC>	C.ASC
+SWVAL	<RAD>	C.RAD
+SWVAL	<NUL>	0
+SWVAL	<ALL>	C.LC!C.WRD!C.ASC!C.RAD
+	ENDTAB
+
+TABLE	CNFTBL	CONFIG	<BAS>
+
+SWVAL	<LSI>	LSI$
+SWVAL	<M18>	P40M$!P40B$!EIS$
+SWVAL	<M22>	P45M$!P40M$!P40B$!P45B$!EIS$
+SWVAL	<P40>	P40B$
+SWVAL	<P45>	P45B$!EIS$
+SWVAL	<EIS>	EIS$
+SWVAL	<FIS>	FIS$!EIS$
+SWVAL	<FPU>	FPU$!EIS$
+SWVAL	<FPP>	FPU$!EIS$
+SWVAL	<KNL>	KERNL$
+SWVAL	<CIS>	CIS$
+SWVAL	<MIC>	MICRO$
+SWVAL	<CM4>	P40M$!P40B$!FIS$!EIS$
+SWVAL	<E60>	P40B$!FIS$!EIS$
+SWVAL	<E85>	P40B$!FPU$!EIS$!MICRO$!P40M$
+SWVAL	<E79>	P40B$!FPU$!EIS$!P40M$!P45M$
+SWVAL	<C42>	P40M$!P40B$!FPU$!EIS$
+SWVAL	<CM3>	BAS$
+SWVAL	<BAS>	BAS$
+SWVAL	<FUL>	-1
+	ENDTAB
+;
+; ТАБЛИЦА КЛЮЧЕЙ
+;
+.MACRO	SWITCH	MNEM	SUBR
+	.WORD	''MNEM
+	.WORD	SUBR
+.ENDM	SWITCH
+
+SWTBL:
+
+SWITCH	P	SW.PRS
+SWITCH	E	SW.PAR
+SWITCH	D	SW.DBL
+SWITCH	C	SW.CMT
+SWITCH	B	SW.BRK
+SWITCH	S	SW.SVI
+SWITCH	T	SW.SVB
+SWITCH	F	SW.FIL
+	ENDTAB
+
+	.PSECT
+DECCSI::
+	MOV	SP,STKSAV
+
+	CLR	TTYFLG
+	MOV	#MODNAM,R5
+	CLR	(R5)+
+	CLR	(R5)+
+	CLR	(R5)+
+	CLR	PARTBL
+	CLR	DISTBL
+	CLR	COMTBL
+	CLR	CNFTBL
+	CLR	DISSWT
+	CLR	FILFLG
+	MOV	#D.M.I,MAX.I
+	MOV	#D.M.B,MAX.B
+	MOV	(PC)+,@(PC)+
+..DEFLI==.
+	.WORD	L.ODD!L.CAL!L.RLS!L.RLL!L.BLL!L.SIG!L.GBL,PARSWT
+	MOV	(PC)+,@(PC)+
+..DEFCM==.
+	.WORD	0,COMSWT	; ПО УМОЛЧАНИЮ - БЕЗ КОММЕНТАРИЯ
+	MOV	(PC)+,@(PC)+
+..DEFCN==.
+	.WORD	P40B$!KERNL$!EIS$!LSI$,CONFIG
+	MOV	#^RMAC,FILEXT	; РАСШИРЕНИЕ ВЫХОДНОГО ФАЙЛА ПО УМОЛЧАНИЮ - DIA
+
+RECOVER:
+	.RCTRLO
+	MOV	HILIM,R0
+	ADD	#4,R0
+	MOV	R0,LOCORE		; АДРЕС ЗА ДРАЙВЕРАМИ
+	.SETTOP
+JSW=44
+	BIC	#30,@#JSW		; ^C ДЛЯ .GTLIN
+	.SRESET
+	.SCCA	#AREA,#0		; РАЗРЕШИТЬ ПРЕРЫВАНИЕ ПО CTRL/C
+	.CSISPC #OUTSPC,#EXT,#0,#CMDLIN	; ВЗЯТЬ КОМАНДНУЮ СТРОКУ
+	BIS	#10,@#JSW
+
+	MOV	(SP)+,R0	; R0 - ЧИСЛО КЛЮЧЕЙ
+	INC	R0
+SW:	DEC	R0
+	BEQ	ENDCSI		; БОЛЬШЕ НЕТ КЛЮЧЕЙ
+	CLR	R2		; ЗНАЧЕНИЕ КЛЮЧА ПО УМОЛЧАНИЮ - 0
+	MOV	(SP)+,R1	; ИМЯ КЛЮЧА
+	BPL	1$		; НЕТ ЗНАЧЕНИЯ
+	MOV	(SP)+,R2	; ЗНАЧЕНИЕ В R2
+
+1$:	MOV	#SWTBL,R5
+2$:	MOV	(R5)+,R4
+	BEQ	ERRSW
+	MOV	(R5)+,R3
+	CMPB	R1,R4		; МНЕМОНИКА СОВПАДАЕТ?
+	BNE	2$
+	CALL	@R3		; ВЫЗВАТЬ П/П ОБРАБОТКИ КЛЮЧА
+	BR	SW
+
+ERRSW:	FATAL	E.SWT		; ОШИБОЧНЫЙ КЛЮЧ
+
+SW.BRK:	MOV	SP,BRKFLG	; BREAK
+	RETURN
+
+SW.SVI:	MOV	R2,MAX.I
+	BEQ	ERRSW
+	RETURN
+
+SW.SVB:	MOV	R2,MAX.B
+	BEQ	ERRSW
+	RETURN
+
+SW.PRS:	MOV	#CNFTBL,R3	; PROCESSOR
+	BR	TBLUP
+
+SW.PAR:	MOV	#PARTBL,R3	; ENABL
+	BR	TBLUP
+
+SW.CMT:	MOV	#COMTBL,R3	; COMMENT
+	BR	TBLUP
+
+SW.DBL:	MOV	#DISTBL,R3	; DISABL
+TBLUP:	CALL	TABLUP
+	BCS	ERRSW
+	RETURN
+
+SW.FIL:	MOV	SP,FILFLG	; FILES
+	RETURN
+
+ENDCSI:
+	MOV	STKSAV,SP	; ВОССТАНОВИТЬ СТЕК
+
+	TSTB	CMDLIN		; ЕСЛИ СТРОКА ПУСТАЯ, НАПЕЧАТАТЬ ИДЕНТ.
+	BNE	1$
+	.PRINT	#IDENT
+	JMP	RECOVER
+
+1$:	BIS	(PC)+,@(PC)+	; УСТАНОВИТЬ БИТЫ ПО УМОЛЧАНИЮ
+..DEFPR==.
+	.WORD	L.ODD!L.CAL!L.RLS!L.RLL!L.BLL!L.SIG!L.GBL,PARSWT
+	BIC	DISSWT,PARSWT	; ПОГАСИТЬ БИТЫ В PARSWT
+	BIS	#BAS$,CONFIG	; БАЗОВЫЕ ИНСТРУКЦИИ ДЕКОДИРУЮТСЯ ВСЕГДА
+	TST	BRKFLG
+	BEQ	FILES
+	MOV	#^RDIA,FILEXT	; РАСШИРЕНИЕ ВЫХОДНОГО ФАЙЛА ПО УМОЛЧАНИЮ - DIA
+	INC	TTYFLG		; ОБЯЗАТЕЛЬНО ВЫВОД НА ТЕРМИНАЛ
+	BIC	#L.LOC!L.NUM,PARSWT	; ЗАПРЕТИТЬ
+	BIS	#C.LC!C.WRD!C.ASC!C.RAD,COMSWT	; ПОЛНЫЙ КОММЕНТАРИЙ
+	.SCCA	#AREA,#TERM	; ЗАПРЕТИТЬ ПРЕРЫВАНИЕ ПО CTRL/C
+;
+; ОТКРЫТИЕ ФАЙЛОВ
+;
+FILES:
+	TST	FILFLG
+	BEQ	6$
+	MOV	#INSPC1,R0
+	TST	@R0
+	BEQ	6$
+	MOV	#OUTSPC,R1
+	TST	@R1		; ВЫХОДНАЯ СПЕЦИФИКАЦИЯ ЗАДАНА?
+	BNE	7$		; ДА
+	MOV	(R0)+,(R1)+	; СКОПИРОВАТЬ ВХОДНОЕ ИМЯ В ВЫХ.
+	MOV	(R0)+,(R1)+
+	MOV	(R0)+,(R1)+
+	MOV	#-1,(R1)+
+7$:	MOV	#INSPC2,R0
+	TST	@R0		; ВХОДНОЙ DIA-ФАЙЛ ЗАДАН?
+	BNE	6$		; ДА
+	MOV	#OUTSPC,R1
+	.REPT	4
+	MOV	(R1)+,(R0)+	; СКОПИРОВАТЬ ВЫХ. ИМЯ В ВХОДНОЕ .DIA
+	.ENDR
+
+6$:	.SERR
+	MOV	#OUTSPC,R4
+	MOV	#FILEXT,R5
+	CLR	R2
+
+5$:	MOV	(R5)+,R3	; РАСШИРЕНИЕ ПО УМОЛЧАНИЮ
+	BEQ	1$		; НЕ НАДО ОТКРЫВАТЬ КАНАЛ
+	TST	@R4
+	BEQ	1$		; СПЕЦИФИКАЦИЯ ФАЙЛА НЕ УКАЗАНА
+	CMP	6(R4),#-1	; РАСШИРЕНИЕ УКАЗАНО?
+	BNE	2$		; ДА
+	MOV	R3,6(R4)	; РАСШИРЕНИЕ ПО УМОЛЧАНИЮ
+2$:	CALL	FETCH		; ЗАГРУЗИТЬ ДРАЙВЕР
+	CMP	R2,#3
+	BGE	3$
+	CALL	ENTER
+	BR	1$
+3$:	CALL	LOOKUP
+1$:	ADD	#10,R4
+	CMP	R2,#3
+	BGE	4$
+	TST	(R4)+
+4$:	INC	R2
+	CMP	R2,#4
+	BLE	5$
+
+10$:	.HERR
+;
+; ОТВЕДЕНИЕ ПАМЯТИ ПОД БЛОЧНЫЕ БУФЕРА
+;
+MEM:
+	MOV	LOCORE,R0
+	MOV	R0,INBUF
+	ADD	#512.,R0	; БУФЕР РАЗМЕРОМ В ОДИН БЛОК
+	MOV	R0,INEND
+	MOV	R0,OUTBUF
+	ADD	#512.,R0	; БУФЕР РАЗМЕРОМ В ОДИН БЛОК
+	MOV	R0,OUTEND
+	MOV	R0,LOCORE
+	MOV	R0,CURMEM
+	.SETTOP #-2		; ВЗЯТЬ ПАМЯТЬ ДО КОНЦА
+	MOV	R0,HICORE	; УСТАНОВИТЬ ОГРАНИЧИТЕЛЬ
+
+	BIS	#20,@#JSW
+	RETURN
+;
+; П/П ДЛЯ DECCSI
+;
+;
+; ЗАГРУЗКА ДРАЙВЕРА
+;
+FETCH:
+	.FETCH	LOCORE,R4
+	BCC	1$
+	FATAL	E.FTCH
+1$:	MOV	R0,LOCORE
+	RETURN
+;
+; ОТКРЫТИЕ НОВОГО ФАЙЛА
+;
+ENTER:
+	.ENTER	#AREA,R2,R4,10(R4)
+	BCC	1$
+	FATAL	E.ENTR
+1$:	RETURN
+;
+; ОТКРЫТИЕ ВХОДНОГО ФАЙЛА
+;
+LOOKUP:
+	.LOOKUP	#AREA,R2,R4
+	BCC	1$
+	FATAL	E.LOOK
+1$:	RETURN
+;
+; ОБРАБОТКА КЛЮЧЕЙ С СИМВОЛИКОЙ RAD50
+; R1 -> УКАЗАТЕЛЬ НА ТАБЛИЦУ
+; R2 - ИМЯ В RAD50
+; R4,R5 - ИСПОЛЬЗ.
+
+TABLUP:
+	TST	(R3)+		; ФЛАГ УСТАНОВЛЕН?
+	BNE	1$		; ДА
+	CLR	@(R3)		; НЕТ, СТЕРЕТЬ ЗНАЧЕНИЕ КЛЮЧА
+	INC	-2(R3)		; УСТАНОВИТЬ ФЛАГ
+1$:	MOV	(R3)+,R5	; СОХР. АДРЕС
+	TST	R1		; УКАЗАНО ЗНАЧЕНИЕ?
+	BMI	2$		; ДА
+	MOV	@R3,R2		; УСТАНОВИТЬ ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ
+2$:	TST	(R3)+		; ПРОПУСТИТЬ ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ
+3$:	MOV	(R3)+,R4	; МНЕМОНИКА
+	BEQ	4$		; НУЛЬ - КОНЕЦ ТАБЛИЦЫ
+	CMP	R2,R4		; МНЕМОНИКА СОВПАДАЕТ?
+	BEQ	5$		; ДА
+	TST	(R3)+		; ПРОПУСТИТЬ МАСКУ
+	BR	3$		; ПОДОЛЖИТЬ ПОИСК
+4$:	SEC
+	RETURN
+5$:	BIS	@R3,@R5		; УСТАНОВИТЬ МАСКУ
+	CLC
+	RETURN
+
+	.END

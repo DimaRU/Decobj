@@ -1,0 +1,111 @@
+.INCLUDE /DECDFN/
+.MODULE DECOBJ,RELEASE=V09,VERSION=09,COMMENT=<ДЕКОДЕР .OBJ - МОДУЛЕЙ>
+.REM	\
+
+	DECOBJ - ДЕКОДЕР ОБ'ЕКТНЫХ МОДУЛЕЙ
+
+РАЗРАБОТАН: БОРОВИКОВ Д.М. , МВТУ ИМ. БАУМАНА, НИИСМ, ОМПС
+
+PASS 1 ОБРАБОТКА ЗАПИСЕЙ GSD , РЕГИСТРАЦИЯ PSECT И GLOBL
+PASS 2 ОБРАБОТКА БЛОКОВ TXT/RLD , РЕГИСТРАЦИЯ МЕТОК
+PASS 3 ОБРАБОТКА БЛОКОВ TXT/RLD , ВЫВОД МЕТОК
+\
+
+
+.AUDIT	.DECOBJ	.DECDAT	.DECINS	.DECCON	.DECIO	.DECERR	.DECTBL	.DECINI
+.AUDIT	.DECCSI	.DECCMD	.DECSHO	.DECGSD	.DECP23	.DECTXT	.DECRLD	.DECLAB
+
+	.MCALL	.PRINT	.TTYOUT
+;
+; DECOBJ : ВЕРХНИЙ УРОВЕНЬ
+;
+DECOBJ::
+.IIF	DF,D$DBG	CALL	DBGSET
+
+	CALL	INIT$		; ИНИЦИАЛИЗАЦИЯ
+	MOV	SP,DECSP	; СОХРАНИТЬ СТЕК ДЛЯ АВАРИЙНОГО ВЫХОДА
+	CALL	DECCSI		; ОБРАБОТКА КОМАНДНОЙ СТРОКИ
+
+	CALL	IN$DIA
+	BCS	1$
+	CALL	GETCTX		; СЧИТАТЬ КОМАНДЫ И МЕТКИ
+	CALL	PR$DIA
+
+1$:	CALL	IN$OBJ		; УСТАНОВИТЬ ВХОДНОЙ ФАЙЛ
+	CALL	OP$MAC		; УСТАНОВИТЬ ВЫХОДНОЙ ФАЙЛ
+	BCC	3$
+	MOV	SP,TTYFLG
+
+3$:	MOV	#1,D.PASS
+	CALL	INIP1$
+	TST	TTYFLG
+	BNE	4$
+	.PRINT	#MSG1
+4$:	CALL	DECGSD		; PASS 1 - ОБРАБОТКА БЛОКОВ GSD
+	CALL	INIP2$
+
+	INC	D.PASS
+	TST	TTYFLG
+	BNE	5$
+	.PRINT	#MSG2
+5$:	CALL	PASS23		; PASS 2 - ОБРАБОТКА TXT/RLD
+
+	BIT	#L.LOC,PARSWT
+	BEQ	6$
+	CALL	SETLSB
+	BR	7$
+6$:	BIT	#L.NUM,PARSWT
+	BEQ	7$
+	CALL	NUMLOC		; ИСПРАВИТЬ НУМЕРАЦИЮ
+
+7$:	CALL	INIP3$
+	INC	D.PASS
+	TST	TTYFLG
+	BNE	8$
+	.PRINT	#MSG3
+8$:	CALL	PASS23		; PASS 3 - ВСТАВИТЬ МЕТКИ
+
+	TST	TTYFLG
+	BNE	9$
+	CALL	CL$MAC
+9$:	CALL	PR$OBJ
+
+	TST	BRKFLG		; ФЛАГ ДИАЛОГА УСТАНОВЛЕН?
+	BEQ	10$		; НЕТ, НЕ ВЫВОДИТЬ DIA-ФАЙЛ
+	CLR	TTYFLG		; СБРОСИТЬ ФЛАГ ВЫВОДА НА ТЕРМИНАЛ
+	CALL	OP$DIA
+	BCS	10$
+	CALL	OUTCTX		; ВЫВЕСТИ КОМАНДЫ И МЕТКИ
+	CALL	CL$DIA
+
+; ВЫВОД ИНФОРМ. О ПАМЯТИ
+
+10$:	.PRINT	#MSGC1
+	MOV	HICORE,R0
+	SUB	LOCORE,R0
+	CALL	DCONV
+	MOV	R0,R1
+12$:	TSTB	(R1)+
+	BNE	12$
+	MOVB	#200,-(R1)
+	.PRINT
+	.TTYOUT	#'/
+	MOV	CURMEM,R0
+	SUB	LOCORE,R0
+	CALL	DCONV
+	.PRINT
+	JMP	DECOBJ
+
+; РАЗМЕСТИТЬ СЕКЦИЮ ДАННЫХ ПЕРЕД ТЕКСТОМ СООБЩ.
+	.PSECT	DECDAT,D
+	.PSECT	DECTXT,D,RO
+IDENT::	.NLCSI	TYPE=I
+	.=.-1
+	.ASCIZ  " , БОРОВИКОВ Д.М., МВТУ/НИИСМ/ОМПС"
+MSG1:	.ASCIZ	/ПЕРВЫЙ ПРОХОД/
+MSG2:	.ASCIZ	/ВТОРОЙ ПРОХОД/
+MSG3:	.ASCIZ	/ТРЕТИЙ ПРОХОД/
+MSGC1:	.ASCII	"ПАМЯТЬ (ОТВЕДЕНО/ИСПОЛЬЗОВАНО) : "<200>
+	.EVEN
+
+	.END	DECOBJ

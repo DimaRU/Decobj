@@ -1,0 +1,227 @@
+.INCLUDE /DECDFN/
+.MODULE DECGSD,RELEASE=V09,VERSION=08,COMMENT=<ДЕКОДИРОВАНИЕ GSD>
+;
+; ОБРАБОТКА ЗАПИСЕЙ GSD
+;	  РЕГИСТРАЦИЯ PSECT И GLOBL
+;
+DECGSD::
+	MOV	#STAPOS,R0
+	CALL	RS$POS		; НА НАЧАЛО OBJ - ФАЙЛА
+GETLIN:
+	CALL	RD$OBJ
+
+	MOV	NXTLIN,R1
+	MOV	(R1)+,R0	; ТИП ЗАПИСИ .OBJ
+	ASL	R0
+	JMP	@GSDREC-2(R0)	; ОБРАБОТАТЬ ЗАПИСЬ .OBJ
+GSD:
+	CMP	R1,NXTEND
+	BGE	GETLIN
+	MOVB	5(R1),R5	; ВЗЯТЬ ТИП GSD
+	CMPB	R5,#4		; GSDNAME?
+	BEQ	1$		; НЕТ
+	CALL	ENDGLB		; ЗАКОНЧИТЬ GLB
+	MOV	#CURLIN,R2
+1$:	ASL	R5
+	JMP	@GSDTYP(R5)	; ОБРАБОТАТЬ GSD
+TITLE:
+	MOV	#TITXT,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	#TITLIN,R5	; СОХРАНИТЬ ИМЯ TITLE
+1$:	MOVB	(R2)+,(R5)+
+	CMP	R2,R0
+	BNE	1$
+	CLRB	@R5
+	CALL	DELSP
+	JMP	OUTLIN
+XFRADD:
+	MOV	#XFR,R5
+	MOV	(R1)+,(R5)+	; СОХРАНИТЬ ИМЯ СЕКЦИИ
+	MOV	(R1)+,(R5)+
+	TST	(R1)+
+	MOV	(R1)+,(R5)+	; И СМЕЩЕНИЕ
+	JMP	GSD
+GSDNAM:
+	BIT	#1,4(R1)	; СЛАБЫЙ СИМВОЛ?
+	BEQ	1$
+	CALL	ENDGLB
+	MOV	#CURLIN,R2
+	MOV	#WEAKTX,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	CALL	DELSP		; УСЕЧЬ КОНЦ. ПРОБЕЛЫ
+	CALL	WR$LIN		; ВЫВЕСТИ
+	BIT	#10,4(R1)	; ЭТО - ОПРЕДЕЛЕНИЕ?
+	BNE	DEF		; ДА
+	JMP	STEP
+
+1$:	BIT	#10,4(R1)	; ССЫЛКА ИЛИ ОПРЕДЕЛЕНИЕ?
+	BNE	DEF		; ОПРЕДЕЛЕНИЕ
+; ССЫЛКА - КОПИРОВАТЬ В ФАЙЛ
+	BIT	#L.GBL,PARSWT	; СОРТИРОВАТЬ ССЫЛКИ?
+	BEQ	11$		; НЕТ
+	CALL	LOGREF		; ЗАСЛАТЬ В ТАБЛИЦУ
+	JMP	GSD
+
+11$:	TST	GLBFLG		; ПРЕД. СТРОКА НЕ ЗАВ.
+	BNE	2$		; ДА
+	INC	GLBFLG
+	MOV	#GLBTXT,R0
+	MOV	#CURLIN,R2
+	CALL	MOVTXT
+	MOV	#6,GLBCNT	; ШЕСТЬ ИМЕН В КОЛОНКУ
+2$:	MOVB	#11,(R2)+
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	CALL	DELSP		; УСЕЧЬ КОНЦ. ПРОБЕЛЫ
+	DEC	GLBCNT
+	BNE	3$
+	CALL	ENDGLB
+3$:	JMP	STEP
+
+DEF:	CALL	ENDGLB
+	BIT	#40,4(R1)	; СИМВОЛ ABS ИЛИ REL?
+	BNE	1$		; REL
+	BIT	#L.ABS,PARSWT	; ПРОСТАВЛЯТЬ МЕТКИ ДЛЯ ABS?
+	BNE	1$		; ДА
+
+	MOV	#CURLIN,R2
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	MOV	#"==,(R2)+
+	MOV	6(R1),R0	; ЗНАЧЕНИЕ
+	CALL	OCONV		; ПРЕОБРАЗОВАТЬ
+	CALL	MOVTXT		; ПЕРЕСЛАТЬ
+	JMP	OUTLIN
+
+1$:	CALL	PLLG		;ЗАСЛАТЬ В ТАБЛИЦУ
+	JMP	GSD
+
+CSECT:
+	MOV	#CSTXT,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	BR	COMPS		; ОБРАБОТАТЬ .PSECT
+PSECT:
+	CALL	BEGLIN
+	MOV	#PSTXT,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+
+	MOV	#FLGLST,R0	; СПИСОК ФЛАГОВ (ASCII)
+	MOVB	4(R1),R3	; ФЛАГИ
+	MOV	#8.,R4		; ВОСЕМЬ БИТОВ ФЛАГОВ
+
+1$:	ROR	R3		; ВЗЯТЬ БИТЬ В 'C'
+	BCS	3$		; ЕСЛИ УСТАНОВЛЕН,ПЕРЕСЛАТЬ ВТОРОЙ АРГ.
+	CALL	MOVTXT		; ПЕРВЫЙ АРГ.
+2$:	TSTB	(R0)+		; ПРОПУСТИТЬ ВТОРОЙ
+	BNE	2$
+	BR	4$		; ПРОДОЛЖИТЬ
+3$:	TSTB	(R0)+		; ПРОПУСТИТЬ ПЕРВЫЙ
+	BNE	3$
+	CALL	MOVTXT		; ПЕРЕПИСАТЬ ВТОРОЙ
+4$:	DEC	R4
+	BNE	1$
+
+COMPS:	CALL	PLPSCT		; ЗАРЕГИСТРИРОВАТЬ
+
+	BIT	#L.PSE,PARSWT	; ВЫВОДИТЬ НОМЕР И ДЛИНУ СЕКЦИИ?
+	BEQ	1$
+	MOVB	#11,(R2)+
+	MOVB	#';,(R2)+
+	MOVB	#' ,(R2)+
+	MOV	-2(R1),R0	; ДЛИНА
+	CALL	OCONV		; ПРЕОБРАЗОВАТЬ
+	CALL	MOVTXT
+	MOVB	#11,(R2)+
+	MOV	$GLBPS,R0	; НОМЕР
+	CALL	OCONV
+	CALL	MOVTXT
+
+1$:	CMPB	-3(R1),#1	; .CSECT?
+	BEQ	3$		; ВЫВОДИТЬ ВСЕГДА
+	BIT	#L.PSE,PARSWT	; ВЫВОДИТЬ НОМЕР И ДЛИНУ СЕКЦИИ?
+	BNE	3$
+	CMP	-8.(R1),#<^R. A> ; . ABS. ?
+	BNE	2$		; НЕТ
+	CMP	-6(R1),#<^RBS.>
+	BEQ	4$		; ДА - НЕ ВЫВОДИТЬ
+2$:	TST	-8.(R1) 	; BLANK ?
+	BNE	3$		; НЕТ
+	TST	-2.(R1) 	; ДЛИНА
+	BEQ	4$		; НУЛЕВАЯ - НЕ ВЫВОДИТЬ
+3$:	CALL	WR$LIN
+4$:	JMP	GSD		; СЛЕД.
+
+IDENT:
+	MOV	#IDTXT,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	CALL	DELSP		; УБРАТЬ КОНЦЕВЫЕ ПРОБЕЛЫ
+	MOVB	#'/,(R2)+
+OUTLIN:
+	CALL	WR$LIN
+STEP:
+	ADD	#8.,R1
+	JMP	GSD
+
+; ЗАВЕРШЕНИЕ СТРОКИ .GLOBL
+ENDGLB:
+	TST	GLBFLG
+	BEQ	1$
+	CALL	WR$LIN
+	CLR	GLBFLG
+1$:	RETURN
+
+EOG:
+	BIT	#L.GBL,PARSWT	; СОРТИРОВАТЬ ССЫЛКИ?
+	BEQ	1$		; НЕТ
+
+	MOV	#REFPNT,R5
+3$:	MOV	@R5,R5
+	BEQ	1$		; КОНЕЦ СПИСКА
+	MOV	R5,R1
+	TST	(R1)+		; ПРОПУСТИТЬ ЛИШНЕЕ
+	TST	GLBFLG		; ПРЕД. СТРОКА НЕ ЗАВ.
+	BNE	2$		; ДА
+	MOV	SP,GLBFLG
+	MOV	#GLBTXT,R0
+	MOV	#CURLIN,R2
+	CALL	MOVTXT
+	MOV	#6,GLBCNT	; ШЕСТЬ ИМЕН В КОЛОНКУ
+2$:	MOVB	#11,(R2)+
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+	CALL	DELSP		; УСЕЧЬ КОНЦ. ПРОБЕЛЫ
+	DEC	GLBCNT
+	BNE	3$
+	CALL	ENDGLB
+	BR	3$
+
+1$:	CALL	ENDGLB
+	MOV	#CURLIN,R2
+	MOV	#ENLSB,R0
+	CALL	MOVTXT
+	CALL	WR$LIN
+	RETURN
+
+	.PSECT	DECDAT,D
+	.NLIST	BEX
+GSDREC: .WORD	GSD,EOG,GETLIN,GETLIN,GETLIN,EOG
+GSDTYP: .WORD	TITLE,CSECT,STEP,XFRADD,GSDNAM,PSECT,IDENT
+
+	.END

@@ -1,0 +1,91 @@
+; ОПРЕДЕЛЕНИЕ ПАРАМЕТРОВ ГЕНЕРАЦИИ DECOBJ И ИСПОЛЬЗ. MACRO
+.MCALL	.MODULE
+.MACRO	......
+.ENDM	......
+;
+; МАКРО ДЛЯ ВЫЗОВА П/П ОБРАБОТКИ ОШИБОК
+;
+.MACRO	ERROR	MSG
+	MOV	#MSG,-(SP)
+	CALL	$ERROR
+.ENDM	ERROR
+.MACRO	FATAL	MSG
+	MOV	#MSG,-(SP)
+	CALL	$FATAL
+.ENDM	FATAL
+............................................................
+;
+; ОТЛАДКА ВЫКЛЮЧЕНА :
+;
+;D$DBG	 =	 1
+............................................................
+;
+; ЗАПРЕЩЕНО ИСПОЛЬЗОВАНИЕ EIS
+;
+;EIS$I	=	1
+............................................................
+;
+; ПАРАМЕТРЫ :
+;
+............................................................
+
+MAXPS	=:	26.	; MAX. КОЛИЧЕСВО СЕКЦИЙ
+D.M.B	=:	10.	; СОХРАНЯТЬ ПОСЛЕДНИЕ 10. БЛОКОВ
+D.M.I	=:	100.	; СОХРАНЯТЬ ПОСЛЕДНИЕ 100. ИНСТРУКЦИЙ
+LEN.B	=:	100	; РАЗМЕР БЛОКА
+MCRLEN	=:	100	; РАЗМЕР БУФЕРА MACRO
+
+.IF	NDF,E$MAC
+.IF	NDF,EIS$I
+.MACRO	SOB	REG,ADDR
+	DEC	REG
+	BNE	ADDR
+.ENDM	SOB
+.ENDC
+..............................................................................
+;
+; MACRO ДЛЯ ОТЛАДКИ
+;
+..............................................................................
+
+.MACRO	DBGMSG	MSG,?A,WAIT=NO
+.IF	DF,D$DBG
+.MCALL	.PRINT
+	JSR	R0,A
+	.ASCIZ	/MSG/
+	.EVEN
+A:	.PRINT
+.IF	IDN,WAIT,<YES>
+JSW	=	44
+TTSPC$	=    10000
+	BIS	#TTSPC$,@#JSW
+.MCALL	.TTYIN
+	.TTYIN
+	BIC	#TTSPC$,@#JSW
+.ENDC
+	MOV	(SP)+,R0
+.ENDC
+.ENDM	DBGMSG
+.MACRO	OCTMSG	MSG,NUM,?A,WAIT=NO
+.IF	DF,D$DBG
+.MCALL	.PRINT
+	JSR	R0,A
+	.ASCII	/MSG/<200>
+	.EVEN
+A:	.PRINT
+	MOV	@SP,R0
+	MOV	NUM,R0
+	CALL	OCONV
+	.PRINT
+.IF	IDN,WAIT,<YES>
+JSW	=	44
+TTSPC$	=    10000
+	BIS	#TTSPC$,@#JSW
+.MCALL	.TTYIN
+	.TTYIN
+	BIC	#TTSPC$,@#JSW
+.ENDC
+	MOV	(SP)+,R0
+.ENDC
+.ENDM	OCTMSG
+.ENDC	; E$MAC

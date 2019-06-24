@@ -1,0 +1,52 @@
+.INCLUDE /DECDFN/
+.MODULE DECERR,RELEASE=V09,VERSION=10,COMMENT=<ОБРАБОТКА ОШИБОК DECOBJ>
+
+	.MCALL	.PRINT
+............................................................
+;
+; П/П ВЫВОДА СООБЩЕНИЙ ОБ ОШИБКАХ
+;
+............................................................
+$ERROR::
+	.PRINT	#PRFIXE
+	MOV	2(SP),R0	; СООБЩЕНИЕ ОБ ОШИБКЕ
+	.PRINT
+	MOV	@SP,2(SP)	; АДРЕС ВОЗВРАТА
+	TST	(SP)+
+	SEC
+	RETURN
+$FATAL::
+	.PRINT	#PRFIXF
+	MOV	2(SP),R0	; СООБЩЕНИЕ ОБ ОШИБКЕ
+	.PRINT
+	MOV	DECSP,SP	; ВОССТАНОВИТЬ СТЕК
+	JMP	DECOBJ		; ПЕРЕЗАПУСТИТЬ DECOBJ
+;
+; СООБЩЕНИЯ ОБ ОШИБКАХ
+;
+	.PSECT	DECERR,D,RO
+
+PRFIXF::.ASCII	/DECOBJ-F-/<200>	;ПРЕФИКС СООБЩЕНИЯ (FATAL)
+PRFIXE::.ASCII	/DECOBJ-E-/<200>	;ПРЕФИКС СООБЩЕНИЯ (ERROR)
+	.EVEN
+.MACRO ERR	MESSAG
+	.ASCIZ	"MESSAG"
+.ENDM	ERR
+
+E.SWT::	ERR	<ОШИБОЧНЫЙ КЛЮЧ>
+E.GLB::	ERR	<ГЛОБАЛЬНЫЙ СИМВОЛ НЕ НАЙДЕН В БИБЛИОТЕКЕ>
+E.IFIL::ERR	<НЕ УКАЗАН ВХОДНОЙ ФАЙЛ>
+E.LAB::	ERR	<МЕТКА НЕ НАЙДЕНА В СПИСКЕ>
+E.SUMM::ERR	<ОШИБКА КОНТРОЛЬНОЙ СУММЫ>
+E.OUT::	ERR	<ОШИБКА ЗАПИСИ В ВЫХОДНОЙ ФАЙЛ>
+E.INP::	ERR	<ОШИБКА ЧТЕНИЯ ВХОДНОГО ФАЙЛА>
+E.MEM::	ERR	<ПАМЯТЬ ИСЧЕРПАНА>
+E.PSCT::ERR	<ТАБЛИЦА СЕКЦИЙ ПЕРЕПОЛНЕНА>
+E.SNTX::ERR	<СИНТАКСИЧЕСКАЯ ОШИБКА В СТРОКЕ>
+E.LOOK::ERR	<ОШИБКА ОТКРЫТИЯ ВХОДНОГО ФАЙЛА>
+E.ENTR::ERR	<ОШИБКА ОТКРЫТИЯ ВЫХОДНОГО ФАЙЛА>
+E.FTCH::ERR	<НЕДОПУСТИМОЕ УСТРОЙСТВО>
+E.MCR::	ERR	<НЕТ MACRO/ПЕРЕПОЛНЕНИЕ БУФЕРА>
+E.NOCM::ERR	<НЕТ КОМАНДЫ>
+
+	.END

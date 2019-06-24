@@ -1,0 +1,456 @@
+.INCLUDE /DECDFN/
+.MODULE DECDATA,RELEASE=V09,VERSION=18,COMMENT=<ОБЩИЕ ДАННЫЕ DECOBJ>
+
+;
+; DECOBJ - ДАННЫЕ И ТАБЛИЦЫ
+;
+	.NLIST	BEX
+	.PSECT	DECDAT,D
+..............................................................................
+TABLLO::
+CURLIN::.BLKB	200.	; ТЕКСТОВЫЙ БУФЕР
+CMDLIN::.BLKB	80.	; СТРОКА ВНУТРЕННЕЙ КОМАНДЫ
+TXTPOS::.BLKW	2	; ПОЗИЦИЯ ТЕК. СТРОКИ TXTLIN В ФАЙЛЕ
+TXTLIN::.BLKW	1	; OBJ - КОД, АДРЕС TXT - БЛОКА
+TXTEND::.BLKW	1	; УКАЗ. "ПОСЛЕ КОНЦА" ДЛЯ TXTLIN
+RLDPOS::.BLKW	2	; ПОЗИЦИЯ ТЕК. СТРОКИ RLDLIN В ФАЙЛЕ
+RLDLIN::.BLKW	1	; OBJ - КОД, АДРЕС RLD - БЛОКА
+RLDEND::.BLKW	1	; УКАЗ. "ПОСЛЕ КОНЦА" ДЛЯ RLDLIN
+NXTPOS::.BLKW	2	; ПОЗИЦИЯ ТЕК. СТРОКИ NXTLIN В ФАЙЛЕ
+NXTLIN::.BLKW	1	; OBJ - КОД, АДРЕС БЛОКА, СЛЕД. ЗА RLD
+NXTEND::.BLKW	1	; УКАЗ. "ПОСЛЕ КОНЦА" ДЛЯ NXTLIN
+FWDPOS::.BLKW	2	; +++
+..............................................................................
+LINEND::.BLKW	1	; УКАЗАТЕЛЬ "ПОСЛЕ КОНЦА СТРОКИ" ДЛЯ CURLIN
+RL.POS::.BLKW	1	; УКАЗАТЕЛЬ В RLDLIN
+TX.ADR::.BLKW	1	; ТЕКУЩИЙ АДРЕС ЗАГРУЗКИ TXTLIN
+TX.EAD::.BLKW	1	; АДРЕС КОНЦА TXT-БЛОКА
+TX.BEG::.BLKW	1	; АДРЕС НАЧАЛА TXT-БЛОКА
+CMDSP::	.BLKW	1	; СОХР. SP УРОВНЯ CMD
+DECSP::	.BLKW	1	; СОХР. SP УРОВНЯ DECOBJ
+C.SUBR::.BLKW	1	; П/П ДЕКОДИРОВАНИЯ #,WORD,BYTE(ТЕКУЩАЯ КОМАНДА)
+R.SUBR::.BLKW	1	; П/П ДЕКОДИРОВАНИЯ #,WORD,BYTE(ПОСТОЯННО)
+NOINTF::.BLKW	1	; ЗАПРЕЩЕНО ДЕКОДИРОВАНИЕ #
+PNTLCN::.BLKW	1	;+++
+CMDLCN::.BLKW	1	;+++
+CURPS::	.BLKW	1	; НОМЕР СЕКЦИИ
+CURLC::	.BLKW	1	; LOCATION COUNTER (LC)
+NXTLC::	.BLKW	1	; LC СЛЕДУЮЩЕЙ ИНСТРУКЦИИ
+LINBYT::.BLKW	3	; ЗНАЧЕНИЯ ДЕК. БАЙТОВ
+LINREL::.BLKW	3	; ФЛАГИ МОДИФ. БАЙТОВ (БАЙТЫ)
+D.PASS::.BLKW	1	; НОМЕР ПРОХОДА
+CURWB::	.BLKW	1	; ТЕКУЩЕЕ СЛОВО СЛОВО ИЛИ БАЙТ
+CURINS::.BLKW	1	; ПЕРВОЕ СЛОВО ТЕКУЩЕЙ ИНСТРУКЦИИ
+BUGS::	.BLKW	1	; ФЛАГ ОБНАРУЖЕНИЯ ВЫХОДА ЗА ГРАНИЦЫ СЕКЦИИ
+PSECTS::.BLKW	1	; ЧИСЛО СЕКЦИЙ
+$GLBPS::.BLKW	1	; НОМЕР СЕКЦИИ ДЛЯ РЕГИСТРАЦИИ GLOBL
+LABLC:: .BLKW	1	; LC СТРОКИ ПРИ ПРОСТАНОВКЕ МЕТОК (DECLAB)
+I.LEN::	.BLKW	1	; ДЛИНА ОБ'ЕКТА НА ТРЕТЬЕМ ПРОХОДЕ
+L.B.PN::.BLKW	1	; УКАЗАТЕЛЬ НА LINBYT
+L.R.PN::.BLKW	1	; УКАЗАТЕЛЬ НА LINREL
+REF.PN::.BLKW	1	; УКАЗАТЕЛЬ НА LABREF
+LBRFPS::.BLKW	1	; СЕКЦИЯ
+LABREF::.BLKW	20.	; СЕКЦИЯ,АДРЕС ССЫЛОК
+NAM.PN::.BLKW	1	; УКАЗАТЕЛЬ НА LABNAM
+LABNAM::.BLKW	20.	; ИМЕНА ГЛОБАЛЬНЫХ ССЫЛОК
+INSPOS::.BLKW	1	; АДРЕС ИНСТРУКЦИИ В ТАБЛИЦЕ
+NUMLS::	.BLKW	1	;+++
+CVTLIM::.BLKW	1	;+++
+EN.ARG::.BLKW	1	;+++
+BRSET::	.BLKW	1	; БЫЛИ ПЕРЕНАЗНАЧЕНЫ BCS,BCC
+TYPINS::.BLKW	1	; ТИП ИНСТР. ДЛЯ ПЕРЕКОДИРОВКИ.
+LSTTYP::.BLKW	1	; ПРЕД. TYPINS
+CONFIG::.BLKW	1	; ТИП ПРОЦЕССОРА
+TTYFLG::.BLKW	1	; ФЛАГ ВЫВОДА НА ТЕРМИНАЛ
+BRKFLG::.BLKW	1	; ФЛАГ ДИАЛОГА
+CURBRK::.BLKW	1	; ФЛАГ ПРЕРЫВАНИЯ НА ДИАЛОГ
+OLDBRK::.BLKW	1	; ПРЕДЫДУЩИЙ CURBRK
+PARSWT::.BLKW	1	; БИТЫ ПАРАМЕТРОВ ДЕКОДИРОВАНИЯ
+PARSAV::.BLKW	1	; БИТЫ ПАРАМЕТРОВ ДЕКОДИРОВАНИЯ (ДЛЯ СОХРАНЕНИЯ)
+COMSWT::.BLKW	1	; БИТЫ ОПРЕДЕЛЕНИЯ СОДЕРЖИМОГО ЛИСТИНГА
+BRKRSN::.BLKW	1	; ТИП ПОИСКА
+OLDRSN::.BLKW	1	; СОХР. BRKRSN
+R.BASE::.BLKW	3	; БАЗА СМЕЩЕНИЯ+MODE ДЛЯ RLB
+OFFSET::.BLKW	1	; СМЕЩЕНИЕ ДЛЯ OFFS
+INFORM::.BLKW	1	; БИТЫ ИНФОРМАЦИИ ДЛЯ ПОИСКА
+REFPS::	.BLKW	1	; НОМЕР СЕКЦИИ ДЛЯ ПОИСКА
+LREFPS::.BLKW	1	; НОМЕР СЕКЦИИ ССЫЛКИ ДЛЯ ПОИСКА
+LREFLC::.BLKW	1	; АДРЕС ССЫЛКИ ДЛЯ ПОИСКА
+DEFPS::	.BLKW	1	; НОМЕР СЕКЦИИ ДЛЯ ПОИСКА ОПРЕДЕЛЕНИЯ МЕТКИ
+DEFLC::	.BLKW	1	; АДРЕС ДЛЯ ПОИСКА ОПРЕДЕЛЕНИЯ МЕТКИ
+TGTINS::.BLKW	1	; ОБРАЗЕЦ ДЛЯ ПОИСКА ИНСТРУКЦИИ.
+TGTWRD::.BLKW	1	; ОБРАЗЕЦ ДЛЯ ПОИСКА СЛОВА
+TGTBYT::.BLKW	1	; ОБРАЗЕЦ ДЛЯ ПОИСКА БАЙТА
+REFNAM::.BLKW	2	; ОБРАЗЕЦ ДЛЯ ПОИСКА ИМЕНИ
+MARKLC::.BLKW	1	; LCN ОТМЕТКИ
+GLBCNT::.BLKW	1	; СЧЕТЧИК ИМЕН В СТРОКЕ .GLOBL
+DSTFLG::.BLKW	1	; ФЛАГ DST
+GLBFLG::.BLKW	1	; ФЛАГ НЕЗАВ. СТРОКИ .GLOBL
+$INLIN::.BLKW	1	; ФЛАГ НЕЗАКРЫТОЙ СТРОКИ .ASCII
+DELIM::	.BLKW	1	; СИМВОЛ - РАЗДЕЛИТЕЛЬ .ASCII
+ENDCHR::.BLKW	1	; ЗАВЕРШАЮЩИЙ СИМВОЛ .ASCII
+STACHR::.BLKW	1	; СТАРТОВЫЙ СИМВОЛ .ASCII
+CHRLIM::.BLKW	1	; МАХ. ДЛИНА СТРОКИ
+CHRCNT::.BLKW	1	; СЧЕТЧИК СИМОЛОВ .ASCII
+LOCLSB::.BLKW	1	; В ЛОКАЛЬНОМ БЛОКЕ
+BLKB::	.BLKW	1	; ФЛАГИ ОБРАБОТКИ .BLKB
+BLKB1::	.BLKW	1
+REPCMD::.BLKW	1	; ЧИСЛО ПОВТОРЕНИЙ MACRO
+CVTBUF::.BLKW	4	; БУФЕР ДЛЯ ПРЕОБРАЗОВАНИЙ
+R50NAM::.BLKW	2	; ВЫХОДНОЙ БУФЕР ДЛЯ ПРЕОБР. ASCII - RAD50
+TITLIN::.BLKW	4	; СОХРАНЕННОЕ ИМЯ TITLE
+XFR::	.BLKW	3	; СТАРТОВЫЙ АДРЕС
+MODCMD::.BLKW	1	; СПИСОК МОДИФИЦИРУЮЩИХ КОМАНД
+SETCMD::.BLKW	1	; СПИСОК КОМАНД УСТАНОВКИ
+M.C.SV::.BLKW	1	; СОХР. MODCMD
+S.C.SV::.BLKW	1	; СОХР. SETCMD
+SV.LIN::.BLKW	5	; ОБЛАСТЬ СОХРАНЕНИЯ ТЕКУЩЕЙ СТРОКИ
+SV.BEG::.BLKW	5	; ОБЛАСТЬ СОХРАНЕНИЯ НАЧАЛА ФАЙЛА
+SV.PNT::.BLKW	5	; ОБЛАСТЬ СОХРАНЕНИЯ ОТМЕТКИ
+SV.INS::.BLKW	5	; БЛОК СОХРАНЕНИЯ ДЛЯ ПРЕД. ИНСТРУКЦИЙ
+SV.BLK::.BLKW	5	; БЛОК СОХРАНЕНИЯ ДЛЯ ПРЕД. TXT - БЛОКОВ
+MAX.I::	.BLKW	1	; КОЛ-ВО СОХР. ИНСТР.
+MAX.B::	.BLKW	1	; КОЛ-ВО СОХР. БЛОКОВ
+MCRBUF::.BLKW	1	; АДРЕС БУФЕРА ДЛЯ MACRO
+MCBEND::.BLKW	1	; АДРЕС КОНЦА БУФЕРА MACRO
+MCRPNT::.BLKW	1	; УКАЗАТЕЛЬ В БУФЕРЕ MACRO
+MCREND::.BLKW	1	; АДРЕС КОНЦА ОПРЕДЕЛЕННОГО MACRO
+MCRFLG::.BLKW	1	; ФЛАГ ВЫПОЛНЕНИЯ/ЗАПИСИ MACRO
+..............................................................................
+REFPNT::.BLKW	1		; ТАБЛИЦА ИМЕН ССЫЛОК
+PSNAME::.BLKW	2*MAXPS		; ТАБЛИЦА ИМЕН СЕКЦИЙ (ALL)
+LLPNT::	.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ LL
+LSPNT::	.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ LS
+GLBPNT::.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ GLOBL (P2,REPL)
+TXTPNT::.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ TXTLAB(P2,REPL)
+LLPN1::	.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ LL (INSLAB)
+LSPN1::	.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ LS (INSLAB)
+GLBPN1::.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ GLOBL (INSLAB)
+TXTPN1::.BLKW	1*MAXPS+1	; ТАБЛИЦА УКАЗАТЕЛЕЙ НА СПИСКИ TXTLAB(INSLAB)
+PSLC::	.BLKW	1*MAXPS+1	; ТАБЛИЦА ТЕК. LC СЕКЦИИ (0)
+PSLEN::	.BLKW	1*MAXPS+1	; ТАБЛИЦА ДЛИН СЕКЦИЙ
+LSBPNT::.BLKW	1*MAXPS+1	; ТАБЛИЦА БЛОКОВ ЛОКАЛЬНЫХ СИМВОЛОВ
+LOCNUM::.BLKW	1*MAXPS+1	; ДОБАВОЧНЫЕ НОМЕРА К LL
+INICMD::.BLKW	1*MAXPS+1	; НАЧАЛЬНЫЕ КОМАНДЫ
+PSCMD::	.BLKW	1*MAXPS+1	; АДРЕС ТЕКУЩЕЙ КОМАНДЫ (0)
+	.EVEN
+	.BLKW	1
+TABLHI::
+..............................................................................
+;
+; ПАМЯТЬ РАСПРЕДЕЛЯЕТСЯ ОТ НАИМЕНЬШЕГО АДРЕСА К БОЛЬШЕМУ
+;
+..............................................................................
+
+LOCORE::.BLKW	1	; НИЖНЯЯ ГРАНИЦА ПАМЯТИ ДЛЯ ТАБЛИЦ
+HICORE::.BLKW	1	; ВЕРХНЯЯ ГРАНИЦА ПАМЯТИ ДЛЯ ТАБЛИЦ
+CURMEM::.BLKW	1	; УКАЗАТЕЛЬ НА СВОБ. ОБЛАСТЬ ПАМЯТИ
+..............................................................................
+;
+; ОПРЕДЕЛЕНИЕ КОМАНД ДИАЛОГА
+;
+..............................................................................
+
+.MACRO	CMD	MNEM	NAME	GBL
+	.ASCIZ	<...NUM>/MNEM/
+.IF	NB,NAME
+	NAME=:...NUM
+.ENDC
+.IF	NB,GBL
+	.GLOBL	NAME
+.ENDC
+...NUM=...NUM+1
+.ENDM	CMD
+
+...NUM=0
+C.MN.T::
+	CMD	INS	CM.INS
+	CMD	WRD	CM.WRD
+	CMD	BYT	CM.BYT
+	CMD	ASC	CM.ASC
+	CMD	ASN	CM.ASN	GLOBAL
+	CMD	RAD	CM.RAD
+	CMD	RLW	CM.RLW
+	CMD	RLB	CM.RLB
+
+	CMD	<D#>	CM.SET	GLOBAL
+	CMD	<E#>
+
+	CMD	<^N>	CM.CVT	GLOBAL
+	CMD	<^O>
+	CMD	<^D>
+	CMD	<^B>
+	CMD	<^R>
+	CMD	<^C>
+	CMD	<'>
+	CMD	<">
+	CMD	<^.>
+	CMD	<^!>
+	CMD	ASET
+	CMD	ALEN	CM.LEN
+	CMD	ENABL
+	CMD	DISABL
+	CMD	ENDCHR
+	CMD	BEGCHR
+	CMD	DELIM
+	CMD	BASE
+	CMD	OFFS
+	CMD	MODE
+	CMD	ONLY	CM.ONL
+
+	CMD	LIST	CM.WRK	GLOBAL
+	CMD	FIND
+	CMD	BSI	CM.BSI
+	CMD	BST	CM.BST
+	CMD	BEGIN
+	CMD	MARK
+	CMD	GMARK
+	CMD	DELC	CM.DEL
+	CMD	INSLAB
+	CMD	INSREF
+	CMD	COM
+	CMD	EXIT
+	CMD	QUIT
+	CMD	MACRO
+	CMD	MEND	CM.MEND
+	CMD	EXEC
+	CMD	CONT
+	CMD	SHOW	CM.SHO
+; СОКРАЩЕНИЯ КОМАНД
+...NUM=CM.WRK
+	CMD	BRK
+...NUM=CM.WRK
+	CMD	LI
+	CMD	F
+...NUM=CM.ONL
+	CMD	ONL
+...NUM=CM.BST
+	CMD	BT
+	CMD	BEG
+	CMD	<M.>
+	CMD	<G.>
+	CMD	DC
+	CMD	IL
+	CMD	IR
+...NUM=CM.SHO
+	CMD	SH
+...NUM=CM.INS
+	CMD	I
+	CMD	W
+	CMD	B
+	CMD	A
+...NUM=CM.RAD
+	CMD	R
+...NUM=CM.MEND
+	CMD	ENDM
+	CMD	EM
+	CMD	C
+...NUM=CM.LEN
+	CMD	LN
+	CMD	EN
+	CMD	DS
+...NUM=CM.BSI
+	CMD	<^>
+...NUM=CM.BSI
+	CMD	</<12>/>
+...NUM=CM.WRK
+	CMD	</<32>/>
+	.BYTE	-1	; КОНЕЦ ТАБЛИЦЫ
+	.EVEN
+
+..............................................................................
+;
+; ТАБЛИЦА СИМВОЛИЧЕСКИХ ПАРАМЕТРОВ КОМАНД
+;
+..............................................................................
+
+.MACRO	PARM	MNEM	VALUE	NAME
+	.WORD	VALUE
+	.ASCIZ	/MNEM/
+	.EVEN
+.IIF	NB,NAME	NAME==:VALUE
+.ENDM	PARM
+
+P.MN.T::
+	PARM	SET	-1	CP.SET
+
+; ТЕМЫ SHOW
+	PARM	BASE	100	SH.BAS
+	PARM	PSECT	101
+	PARM	MEM	102
+	PARM	FREE	102	MAX.SH
+	PARM	DELIM	103
+	PARM	BEGCHR	104
+	PARM	ENDCHR	105
+	PARM	MACRO	106
+	PARM	MODE	107
+	PARM	CMD	110
+
+	PARM	EOF	0	FI.BAS
+	PARM	LREF	1
+	PARM	GREF	2
+	PARM	DEF	3
+	PARM	DINT	4
+	PARM	BADAD	5
+	PARM	ODDAD	6
+	PARM	LINS	7
+	PARM	BYTE	8.
+	PARM	WORD	9.
+	PARM	PS	10.
+	PARM	INS	11.	MX.FND
+
+	PARM	LCN	C.LCN
+	PARM	LC	C.LC
+	PARM	WRD	C.WRD
+	PARM	ASC	C.ASC
+	PARM	RAD	C.RAD
+	PARM	ASB	L.ASB
+	PARM	SIG	L.SIG
+	PARM	BI8	L.BI8
+	PARM	BIT8	L.BI8
+	PARM	ALL	-1
+	PARM	NUL	0
+	PARM	<ESC>	33
+	PARM	<CR>	15
+	PARM	<LF>	12
+	PARM	<FF>	14
+	PARM	<HT>	11
+	PARM	NONE	400
+	PARM	NON	400
+	PARM	NO	400
+	PARM	EXT	401	CP.EXT
+	PARM	TRUN	0	CP.TRN
+	.WORD	0,-1
+
+
+..............................................................................
+
+DC.INS::.WORD	1,0,0,CM.INS,0
+DC.WRD::.WORD	1,0,0,CM.WRD,0
+
+INCRLD::.BYTE	4,6,4,6,10,10,10,4,2,6,0,6,10,10 ,00,4
+;		1 2 3 4  5  6 7 10 1 2 3 4  5  6  17 20
+	.EVEN
+..............................................................................
+
+CCS::	.ASCII	/NZVC/
+RADTXT::.ASCIZ	/.RAD50/<200><11><'/>
+ASCTXT::.ASCIZ	/.ASCII/<200><11>
+BYTXT:: .ASCIZ	/.BYTE/<200><200><11>
+WOTXT:: .ASCIZ	/.WORD/<200><200><11>
+BLTXT:: .ASCIZ	/.BLKB/<200><200><11>
+IDTXT:: .ASCIZ	<11>/.IDENT/<11><'/>
+CSTXT::	.ASCIZ	<11>/.CSECT/<11>
+TITXT::	.ASCIZ	<11>/.TITLE/<11>
+GLBTXT::.ASCIZ	<11>/.GLOBL/
+WEAKTX::.ASCIZ	<11>/.WEAK/<11>
+PSTXT:: .ASCIZ	/.PSECT/<200><11>
+ENLSB:: .ASCIZ	/.ENABL/<11>/LSB/
+DSLSB:: .ASCIZ	/.DSABL/<11>/LSB/
+MKTXT::	.ASCIZ	/,MARK/
+RESBAS::.ASCIZ	/__BASE/
+CMDTXT::.ASCIZ	/*COMMANDS/
+LABTXT::.ASCIZ	/*LABELS/
+EMTTXT::.ASCIZ	/EMT/<200><200><200><200><11>
+TRPTXT::.ASCIZ	/TRAP/<200><200><200><11>
+MS.MEM::.ASCIZ	/СВОБОДНО ПАМЯТИ (БАЙТ) :/
+FLGLST::.ASCIZ	//		; НОМАЛЬНАЯ СЕКЦИЯ /
+	.ASCIZ	/,SAV/		; SAVED IN ROOT
+	.ASCIZ	//		; РЕЗЕРВ
+	.ASCIZ	//		; РЕЗЕРВ
+	.ASCIZ	/,CON/		; CONCATENATED /
+	.ASCIZ	/,OVR/		; OVERLAYED
+	.ASCIZ	//		; РЕЗЕРВ
+	.ASCIZ	//		; РЕЗЕРВ
+	.ASCIZ	/,RW/		; READ/WRITE /
+	.ASCIZ	/,RO/		; READ - ONLY
+	.ASCIZ	/,ABS/		; ABSOLUTE   /
+	.ASCIZ	/,REL/		; RELOCATABLE
+	.ASCIZ	/,LCL/		; LOCAL /
+	.ASCIZ	/,GBL/		; GLOBAL
+	.ASCIZ	/,I/		; INSTRUCTION /
+	.ASCIZ	/,D/		; DATA
+	.EVEN
+
+..............................................................................
+;
+;      ОПРЕДЕЛЕНИЕ БИТОВ PARSWT
+;
+..............................................................................
+
+L.ODD	==:	 1	; РЕЗРЕШЕНИЕ ДЕКОД. ИНСТР. С НЕЧЕТ. ИСП. АДРЕСОМ
+L.CAL	==:	 2	; ЗАМЕНЯТЬ JSR PC НА CALL,RTS PC НА RETURN
+L.DLL	==:	 4	; ЗАПРЕТ ПОСТРОЕНИЯ ЛОК. МЕТОК
+L.RLL	==:     10	; ЗАМЕНЯТЬ СООТВ. ЛОК. МЕТКИ НА ГЛОБ.
+L.RLS	==:     20	; ЗАМЕНЯТЬ СООТВ. ЛОК. СИМВОЛЫ НА ГЛОБ.
+L.SHR	==:     40	; ВЫВОД "КОРОТКИХ" ЛОК. СИМВ.
+L.SIG	==:    100	; ВЫВОДИТЬ КОНСТ. СO ЗНАКОМ
+L.PSE	==:    200	; ВЫВОДИТЬ ИНФОРМАЦИЮ О СЕКЦИЯХ
+L.BLL	==:    400	; СТРОИТЬ LL ТОЛЬКО ДЛЯ BR - ИНСТР.
+L.GBL	==:   1000	; СОРТИРОВАТЬ ССЫЛКИ В GSD
+L.ASB	==:   2000	; ВЫВОДИТЬ MOVB #'A,XXX
+L.REP	==:   4000	; ПОВТОРЯТЬ МЕТКИ
+L.ABS	==:  10000	; ПРОСТАВЛЯТЬ МЕТКИ В ASECT
+L.NUM	==:  20000	; ПОСЛЕДОВ. НУМЕРАЦИЯ МЕТОК(LL,LS)
+L.LOC	==:  40000	; НУМЕРАЦИЯ LOCAL 1 1
+L.BI8	==: 100000	; РАЗРЕШЕНИЕ ДЕКОДИРОВАНИЯ 8BIT ASCII
+
+..............................................................................
+;
+;	ОПРЕДЕЛЕНИЕ БИТОВ COMSWT
+;
+..............................................................................
+
+C.LC	==:	 1	; ВЫВОДИТЬ LC
+C.WRD	==:	 2	; ВЫВОДИТЬ ВОСМЕРИЧНЫЙ АНАЛОГ (СЛОВА)
+C.ASC	==:	 4	; ВЫВОДИТЬ СИМВОЛЬНЫЙ АНАЛОГ (.ASCII)
+C.RAD	==:     10	; ВЫВОДИТЬ АНАЛОГ .RAD50
+C.LCN	==:	20	; ВЫВОДИТЬ LCN ВМЕСТО LC (ДЛЯ ОТЛАДКИ)
+
+..............................................................................
+;
+;	ОПРЕДЕЛЕНИЕ ПОЗИЦИЙ КОММЕНТАРИЯ
+;
+..............................................................................
+
+LC.COL	==:	36.
+ASC.COL ==:	61.
+RAD.COL ==:	70.
+
+..............................................................................
+;
+;	ОПРЕДЕЛЕНИЕ СМЕЩЕНИЙ В СПИСКЕ CMD
+;
+..............................................................................
+
+C$LINK	==:	 0
+C$PSCT	==:	 2
+C$LCN	==:	 4
+C$CMD	==:	 6
+C$NUM	==:	 7
+C$PARM	==:	10
+
+..............................................................................
+;
+;	ОПРЕДЕЛЕНИЕ СМЕЩЕНИЙ В БЛОКЕ СОХРАНЕНИЯ СОСТОЯНИЙ
+;
+..............................................................................
+
+B.BEG	==:	 0
+B.CUR	==:	 2
+B.END	==:	 4
+B.CNT	==:	 6
+B.LEN	==:	10
+..............................................................................
+;
+;	ОПРЕДЕЛЕНИЕ БИТОВ INFOR
+;
+..............................................................................
+
+N.DINT	==:	 1	; РАСКРЫТИЕ НЕПОСРЕДСТВ. АДРЕСАЦИИ В (PC)+
+N.ODD	==:	 2	; ИСПОЛНИТЕЛЬНЫЙ АДРЕС НЕЧЕТНЫЙ В СЛОВНОЙ ИНСТР.
+N.BAD	==:	 4	; ПРИМЕНЕНИЕ АДРЕСАЦИИ PC, (PC), -(PC), @-(PC)
+..............................................................................
+
+
+	.END

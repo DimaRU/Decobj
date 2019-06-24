@@ -1,0 +1,700 @@
+.INCLUDE /DECDFN/
+.MODULE DECTBL,RELEASE=V09,VERSION=19,COMMENT=<ТАБЛИЦЫ DECOBJ>
+.REM	\
+       ВЕДЕНИЕ ТАБЛИЦ МЕТОК , СИМВОЛОВ И СЕКЦИЙ DECOBJ
+
+LLPNT::	.WORD	LOC-LAB POINT
+LSPNT::	.WORD	LOC-SYM POINT
+GLBPNT::.WORD	GLB-SYM POINT
+	 ...
+
+  ТАБЛИЦА ЛОКАЛЬНЫХ МЕТОК (1$:)
+  ПРИ ВЫЗОВЕ:
+  R0 - НОМЕР СЕКЦИИ
+  R3 - ЗНАЧЕНИЕ МЕТКИ (ЕСЛИ = 0 , ТО ПРИБАВИТЬ 1 )
+
+  ВОЗВРАЩАЕТ:
+  ОФОРМЛЕННУЮ МЕТКУ - В (R2), ПРОВЕРЯЕТСЯ, ЗАНЕСЕНА ЛИ МЕТКА
+
+  В LLPNT - АДРЕС НАЧАЛА СПИСКА МЕТОК
+\
+PUTLL::
+	BIT	#L.DLL,PARSWT	; ЗАПРЕЩЕНЫ ЛОК. МЕТКИ?
+	BEQ	1$		; НЕТ
+	JMP	PUTLS		; ДА
+1$:	CMP	REF.PNT,#LABREF+40.
+	BHIS	5$
+	MOV	R0,@REF.PNT	; НОМЕР СЕКЦИИ ССЫЛКИ
+	ADD	#2,REF.PNT
+	MOV	R3,@REF.PNT	; LC ССЫЛКИ
+	ADD	#2,REF.PNT
+5$:	BIT	#L.RLL,PARSWT	; ЗАМЕНЯТЬ ЛОКАЛЬНЫЕ МЕТКИ НА GLOBL?
+	BEQ	2$		; НЕТ
+	CALL	REPLACE 	; ЗАМЕНИТЬ
+	
+2$:	CMP	D.PASS,#3	; ПОСЛЕДНИЙ ПРОХОД?
+	BEQ	OUTLL		; ДА, ТОЛЬКО ВЫВЕСТИ
+	JSR	R1,$SAVE2	; СОХРАНИТЬ РЕГИСТРЫ
+	ASL	R0		; *2 НА СЛОВО
+	ADD	#LLPNT,R0	; ВЫЧИСЛИТЬ
+	BR	3$
+
+4$:	CMP	2(R0),R3	; МЕТКА УЖЕ ЕСТЬ В СПИСКЕ?
+	BEQ	NONEW		; ДА
+	BHI	PLNEW		; НЕ МОЖЕТ БЫТЬ
+3$:	MOV	R0,R1		; СОХРАНИТЬ
+	MOV	@R0,R0		; NEXT LINK
+	BNE	4$		; НЕ КОНЕЦ СПИСКА
+;
+; ПОСТРОЕНИЕ НОВОГО СИМВОЛА
+; В R1 - АДРЕС ПРЕД. УКАЗАТЕЛЯ
+;
+PLNEW:	MOV	R0,R2		; СОХР. R0
+	CALL	GETMEM		; ВЗЯТЬ ПАМЯТЬ (2) В R0
+	BIT	#L.LOC,PARSWT	; LSB?
+	BEQ	1$		; НЕТ
+	ADD	#4,CURMEM	; ВОЗЬМЕМ ЕЩЕ 2 СЛОВА !!!
+	MOV	CURLC,4(R0)	; ЗАПОЛНИТЬ MIN.,MAX
+	MOV	CURLC,6(R0)
+1$:	MOV	R0,@R1		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ	
+	MOV	R2,(R0)+	; ЗАПОЛНИТЬ АДРЕС СЛЕД.
+	MOV	R3,@R0		; ЗАПОЛНИТЬ НОВЫЙ ЭЛЕМЕНТ
+	RETURN
+
+NONEW:	BIT	#L.LOC,PARSWT	; LSB?
+	BEQ	1$		; НЕТ
+	MOV	CURLC,6(R0)	; СОХРАНИТЬ MAX. ССЫЛКУ
+1$:	RETURN
+;
+; OUTLL - ВЫВЕСТИ ЛОКАЛЬНУЮ МЕТКУ ИЗ R3 В (R2)
+;
+OUTLL::
+	MOV	R1,-(SP)
+	BIT	#L.NUM!L.LOC,PARSWT	; ПОСЛ. НУМЕРАЦИЯ?
+	BEQ	3$			; НЕТ
+;
+; ВЫЧИСЛИМ НОМЕР МЕТКИ
+;
+	ASL	R0
+	MOV	LOCNUM(R0),R1	; НАЧАЛЬНЫЙ НОМЕР МЕТКИ В ДАННОЙ СЕКЦИИ
+	ADD	#LLPNT,R0	; ВЫЧ. АДРЕС В ТАБЛИЦЕ
+5$:	INC	R1		; УВЕЛИЧИТЬ НОМЕР
+	TST	R0		; КОНЕЦ СПИСКА?
+	BEQ	99$		; ДА, ФАТАЛЬНАЯ ОШИБКА
+	MOV	@R0,R0		; ВОЗМЕМ СЛЕД. ЭЛЕМЕНТ
+	CMP	2(R0),R3	; СОВП. ЗНАЧ.?
+	BNE	5$		; НЕТ, ПРОД. ПОИСК
+4$:	MOV	R1,R0		; ДА
+	CALL	DCONV		; ПРЕОБР. В ДЕСЯТИЧНЫЙ НОМЕР
+	BR	7$
+99$:	JMP	FATAL		; НА П/П ОБРАБ ОШИБКИ
+
+3$:	MOV	R3,R0		; ЗНАЧЕНИЕ МЕТКИ
+	BNE	2$		; НЕ РАВНО НУЛЮ
+	INC	R0		; СДЕЛАТЬ ИЗ 0$ 1$
+2$:	CALL	OCONV		; ПРЕОБР. В ASCII
+7$:	CALL	MOVTXT		; ЗАСЛАТЬ В СТРОКУ
+	MOVB	#'$,(R2)+	; ЗАКОНЧИТЬ $
+	MOV	(SP)+,R1
+	RETURN
+;
+; ТАБЛИЦА ЛОКАЛЬНЫХ СИМВОЛОВ ( C00011: )
+; ВХОД:
+; R0 - НОМЕР СЕКЦИИ
+; R3 - ЗНАЧЕНИЕ
+;
+PUTLS::
+	CMP	REF.PNT,#LABREF+40.
+	BHIS	4$
+	MOV	R0,@REF.PNT	; НОМЕР СЕКЦИИ ССЫЛКИ
+	ADD	#2,REF.PNT
+	MOV	R3,@REF.PNT	; LC ССЫЛКИ
+	ADD	#2,REF.PNT
+4$:	BIT	#L.RLS,PARSWT	; ЗАМЕНЯТЬ НА GLOBL?
+	BEQ	1$		; НЕТ - ПОСТРОИТЬ
+	CALL	REPLACE 	; ВЫЙДЕТ САМА,ЕСЛИ НАЙДЕТ GLOBL
+
+1$:	CMP	D.PASS,#3	; ТРЕТИЙ ПРОХОД?
+	BEQ	OUTLS		; ДА - ВЫВЕСТИ В СТРОКУ
+
+	JSR	R1,$SAVE2	; СОХР. РЕГИСТРЫ
+	ASL	R0		; ИНДЕКС
+	ADD	#LSPNT,R0	; ВЫЧИСЛИТЬ АДРЕС В ТАБЛИЦЕ
+	BR	3$		; ПЕРЕЙТИ К ПОИСКУ
+
+2$:	CMP	2(R0),R3	; ЭЛЕМЕНТ С ТАКИМ ЗНАЧЕНИЕМ УЖЕ СУЩЕСТВУЕТ?
+	BEQ	NONEW1		; ДА, НЕ СТРОИТЬ НОВЫЙ
+	BHI	PLNEW1		; ТЕКУЩИЙ ЭЛЕМЕНТ БОЛЬШЕ - ВСТАВИТЬ ПЕРЕД НИМ
+3$:	MOV	R0,R1		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R0,R0
+	BNE	2$
+;
+; ПОСТРОЕНИЕ НОВОГО СИМВОЛА
+; В R1 - АДРЕС ПРЕД. УКАЗАТЕЛЯ
+;
+PLNEW1:	MOV	R0,R2
+	CALL	GETMEM		; ВЗЯТЬ ПАМЯТЬ (2) В R0
+	MOV	R0,@R1		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ
+	MOV	R2,(R0)+	; LINK
+	MOV	R3,@R0		; ЗАПОЛНИТЬ НОВЫЙ ЭЛЕМЕНТ
+NONEW1:	RETURN
+;
+; ВЫВЕСТИ ЛОКАЛЬНУЮ МЕТКУ В (R2)
+;
+; R0 - НОМЕР СЕКЦИИ
+; R3 - LC
+;
+OUTLS::
+	MOV	R1,-(SP)
+	ADD	#100,R0 	; ПРЕОБР. В ЛИТЕРУ (A,B,C)
+	MOVB	R0,(R2)+	; ВЫВЕСТИ
+	BIT	#L.NUM,PARSWT	; ПОСЛЕДОВ. НУМЕРАЦИЯ?
+	BEQ	3$		; НЕТ
+	SUB	#100,R0 	; ВЫЧИСЛИМ НОМЕР МЕТКИ
+	ASL	R0
+	ADD	#LSPNT,R0
+	CLR	R1
+5$:	MOV	@R0,R0
+	CMP	2(R0),R3	; СОВП. ЗНАЧ.?
+	BEQ	4$		; ДА
+	INC	R1
+	TST	R0
+	BEQ	99$
+	BR	5$
+99$:	JMP	FATAL
+
+4$:	MOV	R1,R0
+	BIT	#L.SHR,PARSWT	; КОРОТКО?
+	BEQ	7$		; НЕТ
+	CALL	DCONV		; ПРЕОБР. В ДЕСЯТИЧНЫЙ НОМЕР
+	BR	2$
+7$:	CALL	FDCONV	
+	BR	2$
+
+3$:	MOV	R3,R0
+	BIT	#L.SHR,PARSWT	; ВЫВОДИТЬ КОРОТКО?
+	BNE	1$		; ДА
+	CALL	FOCONV		; ПРЕОБРАЗОВАТЬ В ASCII
+	TSTB	(R0)+		; УДАЛИТЬ ПЕРВЫЙ '0'
+2$:	CALL	MOVTXT		; ВЫВЕСТИ В СТРОКУ
+	MOV	(SP)+,R1
+	RETURN
+
+1$:	CALL	OCONV
+	BR	2$		; ВЫВЕСТИ
+;
+; ЗАМЕНЯТЬ НА СОВП. ГЛОБАЛЬНЫЙ СИМВОЛ
+;
+REPLACE:
+	MOV	R1,-(SP)
+	MOV	R0,R1		; НОМЕР СЕКЦИИ
+	ASL	R1		; ИНДЕКС
+	MOV	GLBPNT(R1),R1	; ПЕРВЫЙ ЭЛЕМЕНТ
+	BEQ	2$		; ГЛОБАЛЬНЫХ СИМВОЛОВ НЕТ
+1$:	CMP	2(R1),R3	; СОВПАДАЮТ ЗНАЧЕНИЯ?
+	BEQ	5$		; ДА - НАШЛИ
+	MOV	(R1),R1 	; СЛЕД.
+	BNE	1$
+;
+; ЗАМЕНИТЬ НА СОВП. ТЕКСТОВЫЙ СИМВОЛ
+;
+2$:	MOV	R0,R1		; НОМЕР СЕКЦИИ
+	ASL	R1		; ИНДЕКС
+	MOV	TXTPNT(R1),R1	; ПЕРВЫЙ ЭЛЕМЕНТ
+	BEQ	4$		; ТЕКСТОВЫХ СИМВОЛОВ НЕТ
+3$:	CMP	2(R1),R3	; СОВПАДАЮТ ЗНАЧЕНИЯ?
+	BEQ	5$		; ДА - НАШЛИ
+	MOV	(R1),R1 	; СЛЕД.
+	BNE	3$
+
+4$:	MOV	(SP)+,R1
+	RETURN			; НЕ НАШЛИ - ВОЗВРАТИТЬСЯ В PUTLL ИЛИ PUTLS
+
+5$:	CMP	(R1)+,(R1)+	; НА ИМЯ
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБР. В ASCII
+	MOV	R0,R2
+	CALL	DELSP
+6$:	MOV	(SP)+,R1
+	TST	(SP)+		; ОТМЕНИТЬ ВОЗРАТ В PUTLL ИЛИ PUTLS
+	RETURN
+
+FATAL::				; DEBUG
+	ERROR	E.LAB
+	MOVB	#'!,(R2)+
+	MOV	(SP)+,R1
+	RETURN
+;
+; ТАБЛИЦА ГЛОБАЛЬНЫХ СИМВОЛОВ
+; ВХОД:
+; $GLBPS - НОМЕР СЕКЦИИ
+; (R1) - GSDNAME
+;
+; ВЫХОД - GSDNAME УДАЛИТЬ
+; R0,R4,R5 - РАБОЧИЕ
+;
+PLLG::
+	MOV	6(R1),R5	; LC
+	MOV	$GLBPS,R0
+	ASL	R0		; *2 НА СЛОВО
+	ADD	#GLBPNT,R0	; ВЫЧИСЛИТЬ
+	BR	2$
+
+1$:	CMP	2(R0),R5
+	BHIS	PLNEW2
+2$:	MOV	R0,R4		; СОХРАНИТЬ
+	MOV	@R0,R0		; СЛЕДУЮЩИЙ
+	BNE	1$		; ЕСЛИ НЕ КОНЕЦ СПИСКА
+;
+; ПОСТРОЕНИЕ НОВОГО СИМВОЛА
+; В R4 - АДРЕС ПРЕД. УКАЗАТЕЛЯ
+;
+PLNEW2:	MOV	R0,-(SP)
+	CALL	GTMEM1		; ВЗЯТЬ ПАМЯТЬ (4) В R0
+	MOV	R0,@R4		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ
+	MOV	@SP,(R0)+	; ПОСЛЕДНИЙ
+	MOV	R5,(R0)+	; LC
+	MOV	(R1)+,(R0)+	; ИМЯ RAD50
+	MOV	(R1)+,(R0)+
+	CMP	(R1)+,(R1)+	; ОСТ. ПРОП.
+	TST	(SP)+
+	RETURN
+;
+; ТАБЛИЦА ГЛОБАЛЬНЫХ ССЫЛОК
+; ВХОД:
+; (R1) - GSDNAME
+;
+; ВЫХОД - GSDNAME УДАЛИТЬ
+; R0,R4 - РАБОЧИЕ
+;
+LOGREF::
+	MOV	#REFPNT,R0
+	BR	2$
+
+1$:	CMP	2(R0),@R1	; ПЕРВАЯ ЧАСТЬ ИМЕНИ БОЛЬШЕ?
+	BHI	PLREF		; ДА, ВСТАВИТЬ ПЕРЕД ЭТИМ СИМВОЛОМ
+	BLO	2$
+	CMP	4(R0),2(R1)	; ВТОРАЯ ЧАСТЬ ИМЕНИ БОЛЬШЕ?
+	BHIS	PLREF		; ДА, ВСТАВИТЬ
+2$:	MOV	R0,R4		; СОХРАНИТЬ
+	MOV	@R0,R0		; СЛЕДУЮЩИЙ
+	BNE	1$		; ЕСЛИ НЕ КОНЕЦ СПИСКА
+;
+; ПОСТРОЕНИЕ НОВОГО СИМВОЛА
+; В R4 - АДРЕС ПРЕД. УКАЗАТЕЛЯ
+;
+PLREF:	MOV	R0,-(SP)
+	CALL	GTMEM1		; ВЗЯТЬ ПАМЯТЬ (4) В R0
+	MOV	R0,@R4		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ
+	MOV	@SP,(R0)+	; ПОСЛЕДНИЙ
+	MOV	(R1)+,(R0)+	; ИМЯ RAD50
+	MOV	(R1)+,(R0)+
+	CMP	(R1)+,(R1)+	; ОСТ. ПРОП.
+	TST	(SP)+
+	RETURN
+............................................................
+; ТАБЛИЦА ТЕКСТОВЫХ СИМВОЛОВ
+; ВХОД:
+; R1 - LC
+; R2 - PS
+............................................................
+PLTXT::
+	JSR	R1,$SAVE3
+	ASL	R2
+	ADD	#TXTPNT,R2
+	BR	2$
+
+1$:	CMP	2(R2),R1
+	BEQ	NONEW3
+	BHI	PLNEW3
+2$:	MOV	R2,R3		; СОХРАНИТЬ LINK ПРЕД. ЭЛ-ТА
+	MOV	@R2,R2		; СЛЕДУЮЩИЙ
+	BNE	1$		; ЕСЛИ НЕ КОНЕЦ СПИСКА
+;
+; ПОСТРОЕНИЕ НОВОГО СИМВОЛА
+;
+PLNEW3:	CALL	GTMEM1		; ВЗЯТЬ ПАМЯТЬ (4) В R0
+	MOV	R0,@R3		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ
+	MOV	R2,(R0)+	; LINK
+	MOV	R1,(R0)+	; LC
+	MOV	R50NAM,(R0)+	; ИМЯ RAD50
+	MOV	R50NAM+2,(R0)+
+	RETURN
+NONEW3:	MOV	R50NAM,4(R2)	; ЗАМЕНИТЬ ИМЯ НА НОВОЕ
+	MOV	R50NAM+2,6(R2)
+	RETURN
+;
+; ЗАНЕСЕНИЕ В ТАБЛИЦУ СЕКЦИЙ
+;
+;  (R1) - ИМЯ,ФЛАГИ И ДЛИНА СЕКЦИИ
+;
+PLPSCT::
+	CMP	PSECTS,#MAXPS	; MAX. ЧИСЛО СЕКЦИЙ ПРЕВЫШЕНО?
+	BGE	20$		; ДА
+
+; ДЛЯ FORTRAN - .OBJ : ПОИЩЕМ СЕКЦИЮ
+	MOV	#1,R5		; R5 - СЧЕТЧИК
+	TST	PSECTS		; ПЕРВАЯ СЕКЦИЯ?
+	BEQ	1$		; ДА - НЕ ИСКАТЬ
+	MOV	#PSNAME,R0
+4$:	CMP	(R0),(R1)
+	BNE	2$
+	CMP	2(R0),2(R1)
+	BEQ	3$		; НАШЛИ - ПЕРЕПИСАТЬ ДАННЫЕ
+2$:	CMP	(R0)+,(R0)+
+	INC	R5
+	CMP	R5,PSECTS
+	BLE	4$
+
+1$:	INC	PSECTS		; ДОБАВИМ СЕКЦИЮ
+	MOV	R5,R0
+	ASL	R0
+	ASL	R0		;*4.
+	ADD	#PSNAME-4,R0	; ВЫЧИСЛИТЬ СМЕЩЕНИЕ
+3$:	MOV	R5,$GLBPS	; НОМЕР ПОСЛ. ЗАРЕГ. СЕКЦИИ
+	ASL	R5		;*2.
+	MOV	(R1)+,(R0)+	; ЗАСЛАТЬ ИМЯ СЕКЦИИ
+	MOV	(R1)+,(R0)+
+	MOV	#DC.INS,INICMD(R5) ; УСТАНОВИТЬ КОМАНДУ INS
+	BIT	#200,(R1)+	; СЕКЦИЯ ДАННЫХ?
+	BEQ	6$		; НЕТ
+	MOV	#DC.WRD,INICMD(R5) ; УСТАНОВИТЬ КОМАНДУ WRD
+6$:	MOV	(R1)+,PSLEN(R5) ; СОХРАНИТЬ ДЛИНУ СЕКЦИИ
+	RETURN
+20$:	FATAL	E.PSCT
+;
+; ВВОД В СПИСОК КОМАНД
+;	В R0 - АДРЕС ЭЛЕМЕНТА
+;
+LOGCMD::
+	JSR	R1,$SAVE3	; СОХР. РЕГИСТРЫ
+	MOV	R0,R3
+	CMPB	C$CMD(R3),#CM.SET ; КОМАНДА ТИПА SET?
+	BGE	LOGSET		; ДА
+4$:	MOV	#M.C.SV,R0
+	BR	2$		; ПЕРЕЙТИ К ПОИСКУ
+
+1$:	CMP	C$LCN(R0),C$LCN(R3)	; ЭЛЕМЕНТ УЖЕ СУЩЕСТВУЕТ?
+	BEQ	5$		; ДА, УДАЛИТЬ ПРЕД., ПОСТРОИТЬ НОВЫЙ
+	BHI	LOG		; ТЕКУЩИЙ ЭЛЕМЕНТ БОЛЬШЕ - ВСТАВИТЬ ПЕРЕД НИМ
+2$:	MOV	R0,R1		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R0,R0
+	BNE	1$
+	BR	LOG
+
+5$:	MOV	@R0,@R1 	; УДАЛИТЬ ЭЛЕМЕНТ
+	BR	4$		; ПОВТОРИТЬ РЕГИСТРАЦИЮ
+LOGSET:
+	MOV	#S.C.SV,R0
+	BR	2$		; ПЕРЕЙТИ К ПОИСКУ
+
+1$:	CMP	C$LCN(R0),C$LCN(R3)	; ЭЛЕМЕНТ С УЖЕ СУЩЕСТВУЕТ?
+	BHI	LOG		; ТЕКУЩИЙ ЭЛЕМЕНТ БОЛЬШЕ - ВСТАВИТЬ ПЕРЕД НИМ
+2$:	MOV	R0,R1		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R0,R0
+	BNE	1$
+
+LOG:	MOVB	C$NUM(R3),R5	; КОЛИЧЕСТВО ДОП. СЛОВ
+	MOV	R5,R2		; СОХРАНИМ В R2
+	ASL	R5
+	ADD	#4*2,R5 	; 4 ОБЯЗ. СЛОВА
+	CALL	GTMEM2		; ВЗЯТЬ ПАМЯТЬ В R5
+	MOV	R5,@R1		; ЗАПОЛНИТЬ УКАЗАТЕЛЬ
+	MOV	R0,(R5)+	; LINK
+	TST	(R3)+
+	ADD	#3,R2		; PSECT,LCN,CMD,NUM
+1$:	MOV	(R3)+,(R5)+	; ПЕРЕПИСАТЬ ОСТАЛЬНОЕ
+	DEC	R2
+	BNE	1$
+	RETURN
+.REM	\
+............................................................
+;
+; УДАЛЕНИЕ ЭЛЕМЕНТА ИЗ СПИСКА.
+; ВХОД: R0 - АДРЕС ОПРЕДЕЛЕНИЯ ЭЛЕМЕНТА (LC ИЛИ LCN)
+;	R1 - АДРЕС НАЧАЛА СПИСКА
+; ВЫХОД: R0 - АДРЕС УДАЛЕННОГО БЛОКА
+;
+............................................................
+DELITM::
+	JSR	R1,$SAVE2
+	BR	2$		; ПЕРЕЙТИ К ПОИСКУ
+
+1$:	CMP	C$LCN(R1),R0	; LC СОВПАДАЕТ?
+	BEQ	3$		; ДА, УДАЛИТЬ
+2$:	MOV	R1,R2		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R1,R1		; СЛЕДУЮЩИЙ ЭЛЕМЕНТ
+	BNE	1$
+	SEC
+	RETURN
+3$:	MOV	@R1,@R2 	; УДАЛИТЬ ЭЛЕМЕНТ
+	MOV	R1,R0		; АДРЕС ЭЛЕМЕНТА
+	CLC
+	RETURN
+............................................................
+;
+; ПОИСК ЭЛЕМЕНТА В СПИСКЕ
+; ВХОД: R0 - АДРЕС, ДО КОТ. ИСКАТЬ
+;	R1 - ЗАГОЛОВОК СПИСКА
+; ВЫХОД: R0 - АДРЕС ЭЛЕМЕНТА
+;
+............................................................
+FNDITM::
+	JSR	R1,$SAVE2
+	MOV	@R1,R1
+	BEQ	2$		; ПУСТОЙ СПИСОК
+1$:	CMP	C$LCN(R1),R0	; LC <=?
+	BHI	3$		; ДА, НАШЛИ
+2$:	MOV	R1,R2		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R1,R1		; СЛЕДУЮЩИЙ ЭЛЕМЕНТ
+	BNE	1$
+	BR	4$
+3$:	MOV	R2,R0		; ПРЕД. ЭЛЕМЕНТ
+	TST	(PC)+
+4$:	SEC
+	RETURN
+\
+;
+; УДАЛЕНИЕ КОМАНДЫ ИЗ СПИСКА ОСНОВНЫХ КОМАНД
+; ВХОД: R0 - АДРЕС КОМАНДЫ
+;
+DELCMD::
+	JSR	R1,$SAVE2
+	MOV	#M.C.SV,R1
+	BR	2$		; ПЕРЕЙТИ К ПОИСКУ
+
+1$:	CMP	C$LCN(R1),R0	; LC СОВПАДАЕТ?
+	BEQ	3$		; ДА, УДАЛИТЬ
+2$:	MOV	R1,R2		; СОХРАНИТЬ АДРЕС ТЕК.
+	MOV	@R1,R1
+	BNE	1$
+	ERROR	E.NOCM
+	RETURN
+3$:	MOV	@R1,@R2		; УДАЛИТЬ ЭЛЕМЕНТ
+	RETURN
+............................................................
+;
+; ВВОД В ТАБЛИЦУ СОСТОЯНИЙ ДЕКОДЕРА
+;   ВХОД: R0 - АДРЕС БЛОКА СОХРАНЕНИЯ
+; ФОРМАТ БЛОКА СОХРАНЕНИЯ :
+;	B.CUR(R0) - УКАЗАТЕЛЬ НА СВОБОДНОЕ МЕСТО В ПАМЯТИ
+;	B.BEG(R0) - АДРЕС НАЧАЛА ОТВЕДЕННОЙ ПАМЯТИ
+;	B.END(R0) - АДРЕС КОНЦА ОТВЕДЕННОЙ ПАМЯТИ
+;	B.CNT(R0) - СЧЕТЧИК ЗАНЯТЫХ МЕСТ
+;	B.LEN(R0) - СКОЛЬКО ВСЕГО МЕСТ
+;
+............................................................
+PT.B.P::
+	MOV	R1,-(SP)
+	MOV	B.CUR(R0),R1
+	CMP	R1,B.END(R0)
+	BLOS	1$
+	MOV	B.BEG(R0),R1
+	MOV	R1,B.CUR(R0)
+1$:	INC	B.CNT(R0)
+	CMP	B.CNT(R0),B.LEN(R0)
+	BLE	2$
+	MOV	B.LEN(R0),B.CNT(R0)
+2$:	ADD	#2*5,B.CUR(R0)
+	MOV	R1,R0
+	MOV	(SP)+,R1
+	RETURN
+............................................................
+;
+; ИЗВЛЕЧЕНИЕ ИЗ ТАБЛИЦЫ СОСТОЯНИЙ ДЕКОДЕРА
+;   ВХОД: R0 - АДРЕС БЛОКА СОХРАНЕНИЯ
+;
+............................................................
+GT.B.P::
+	MOV	R1,-(SP)
+	MOV	B.CUR(R0),R1
+	TST	B.CNT(R0)
+	BEQ	1$
+	DEC	B.CNT(R0)
+	SUB	#2*5,R1
+	CMP	R1,B.BEG(R0)
+	BHIS	1$
+	MOV	B.END(R0),R1
+1$:	MOV	R1,B.CUR(R0)
+	MOV	R1,R0
+	MOV	(SP)+,R1
+	RETURN
+............................................................
+;
+; П/П ВЫДЕЛЕНИЯ ПАМЯТИ
+;
+............................................................
+GETMEM::			; ВЫДАТЬ ДВА СЛОВА В R0
+	MOV	CURMEM,R0
+	ADD	#4,R0
+	CMP	R0,HICORE	; ЕСТЬ ПАМЯТЬ?
+	BHIS	NOMEM
+	MOV	R0,CURMEM	; CURMEM УКАЗЫВАЕТ НА СВОБ. ПАМЯТЬ
+	SUB	#4,R0
+	RETURN
+
+GTMEM1::			; ВЫДАТЬ ЧЕТЫРЕ СЛОВА В R0
+	MOV	CURMEM,R0
+	ADD	#8.,R0
+	CMP	R0,HICORE
+	BHIS	NOMEM
+	MOV	R0,CURMEM
+	SUB	#8.,R0
+	RETURN
+
+GTMEM2::			; ВЫДАТЬ ПАМЯТЬ В R5 ; R5 - ЧИСЛО БАЙТ
+	ADD	CURMEM,R5
+	CMP	R5,HICORE
+	BHIS	NOMEM
+	MOV	R5,-(SP)
+	MOV	CURMEM,R5
+	MOV	(SP)+,CURMEM
+	RETURN	
+
+NOMEM:	FATAL	E.MEM
+............................................................
+;
+; ОПРЕДЕЛЕНИЕ LSB
+;
+............................................................
+LINK	=0
+DEF	=2
+LREF	=4
+HREF	=6
+
+SETLSB::
+	MOV	#1,R5
+NEXT:	MOV	R5,R0
+	ASL	R0
+	TST	LLPNT(R0)		; НАЙДЕМ НЕПУСТОЙ СПИСОК LL
+	BEQ	END
+
+1$:	MOV	R0,R1
+	ADD	#LLPNT,R0
+2$:	MOV	@R0,R0
+	BEQ	INSLSB
+	CMP	DEF(R0),LREF(R0)
+	BHIS	3$
+	MOV	DEF(R0),LREF(R0)
+3$:	CMP	DEF(R0),HREF(R0)
+	BLOS	2$
+	MOV	DEF(R0),HREF(R0)
+	BR	2$
+
+END:	INC	R5
+	CMP	R5,PSECTS
+	BLE	NEXT
+	RETURN
+INSLSB:
+	MOV	R1,R3
+	ADD	#LSBPNT,R1
+	ADD	#LLPNT,R3
+1$:	MOV	@R3,R3		; ОЧЕРЕДНОЙ ЭЛЕМЕНТ LL
+	BEQ	LSBOPT		; КОНЕЦ СПИСКА - ОПТИМИЗИРОВАТЬ ЕГО
+	MOV	HREF(R3),R4	; АДРЕС НАИБОЛЬШЕЙ ССЫЛКИ
+	MOV	R4,R2
+	MOV	R3,R0		; ПОИЩЕМ МЕТКУ, ВХОДЯЩУЮ В ОБЛ. ОПР. ТЕК. МЕТ.
+2$:	MOV	@R0,R0		; ОЧЕРЕДНОЙ ЭЛЕМЕНТ
+	BEQ	4$		; КОНЕЦ СПИСКА - УСТАНОВИТЬ LSB
+	CMP	HREF(R0),R2	; НОВЫЙ MAX. ПРЕВЫШАЕТ СТАРЫЙ?
+	BLOS	3$		; НЕТ
+	MOV	HREF(R0),R2	; ДА, УСТ. НОВЫЙ
+3$:	CMP	LREF(R0),R4	; ВХОДИТ В ОБЛАСТЬ ОПРЕДЕЛЕНИЯ?
+	BHI	2$		; НЕТ
+	MOV	R0,R3		; ДА, РАСШИРИМ ОБЛАСТЬ ОПРЕДЕЛЕНИЯ
+	MOV	R2,R4		; НОВЫЙ MAX.
+	BR	2$		; ДА, УСТАНОВИМ НОВЫЙ MAX.
+4$:	CALL	GETMEM		; УСТАНОВКА ОТМЕТКИ О НОВОМ БЛОКЕ LSB
+	MOV	R0,@R1		; LINK ПРЕД.
+	MOV	R0,R1		; ПРЕД.
+	CLR	(R0)+		; LINK
+	MOV	R4,(R0)+	; LC
+	BR	1$		; ПРОДОЛЖИМ
+............................................................
+;
+; ОПТИМИЗАЦИЯ СПИСКА LSB
+;
+............................................................
+LSBOPT:
+	ASL	R5
+RECOV:	MOV	LLPNT(R5),LLPN1(R5)
+	MOV	LSPNT(R5),LSPN1(R5)
+	MOV	GLBPNT(R5),GLBPN1(R5)
+	MOV	TXTPNT(R5),TXTPN1(R5)
+	MOV	#LSBPNT,R3
+	ADD	R5,R3
+NXT1:	MOV	@R3,R4		; LOW(CUR)
+	BEQ	ENDOPT
+	MOV	2(R4),R2	; LOW LIMIT
+1$:	MOV	LLPN1(R5),R0	; ТЕСТ НА LL
+	BEQ	ENDOPT
+	CMP	2(R0),R2
+	BHI	2$
+	MOV	@R0,LLPN1(R5)
+	BR	1$
+2$:	MOV	LSPN1(R5),R0	; ТЕСТ НА LS
+	BEQ	3$
+	CMP	2(R0),R2
+	BHI	3$
+	MOV	@R0,LSPN1(R5)
+	BR	2$
+3$:	MOV	GLBPN1(R5),R0	; ТЕСТ НА GLB
+	BEQ	4$
+	CMP	2(R0),R2
+	BHI	4$
+	MOV	@R0,GLBPN1(R5)
+	BR	3$
+4$:	MOV	TXTPN1(R5),R0	; ТЕСТ НА TXT
+	BEQ	5$
+	CMP	2(R0),R2
+	BHI	5$
+	MOV	@R0,TXTPN1(R5)
+	BR	4$
+
+5$:	MOV	LLPN1(R5),R0
+	BEQ	ENDOPT
+	MOV	2(R0),R1
+
+	MOV	LSPN1(R5),R0
+	BEQ	6$
+	CMP	2(R0),R1
+	BLOS	NXT2
+
+6$:	MOV	GLBPN1(R5),R0
+	BEQ	7$
+	CMP	2(R0),R1
+	BLOS	NXT2
+
+7$:	MOV	TXTPN1(R5),R0
+	BEQ	DEL
+	CMP	2(R0),R1
+	BLOS	NXT2
+
+DEL:	MOV	@R4,@R3
+	BR	RECOV
+NXT2:	MOV	R4,R3
+	BR	NXT1
+ENDOPT:	ASR	R5
+	JMP	END
+............................................................
+;
+; ПОПРАВКИ К НУМЕРАЦИИ ЛОКАЛЬНЫХ МЕТОК, ЕСЛИ НЕСКОЛЬКО СЕКЦИЙ ИНСТРУКЦИЙ.
+;
+............................................................
+NUMLOC::
+	MOV	#1,R5
+	CLR	R0
+1$:	MOV	R5,R4
+	ASL	R4
+	MOV	LLPNT(R4),R1
+	BEQ	3$
+2$:	INC	R0
+	MOV	@R1,R1
+	BNE	2$
+3$:	MOV	R0,LOCNUM+2(R4)
+	INC	R5
+	CMP	R5,PSECTS
+	BLT	1$
+	RETURN
+
+	.END

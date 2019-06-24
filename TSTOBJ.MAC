@@ -1,0 +1,116 @@
+	.TITLE	TSTOBJ
+
+DECOBJ::
+START::
+	CALL	INIT$		; ИНИЦИАЛИЗАЦИЯ
+	MOV	SP,DECSP	; СОХРАНИТЬ СТЕК ДЛЯ АВАРИЙНОГО ВЫХОДА
+	CALL	DECCSI		; ОБРАБОТКА КОМАНДНОЙ СТРОКИ
+
+2$:	CALL	IN$OBJ		; УСТАНОВИТЬ ВХОДНОЙ ФАЙЛ
+	CALL	OP$MAC		; УСТАНОВИТЬ ВЫХОДНОЙ ФАЙЛ
+	BCC	3$
+	INC	TTYFLG
+
+3$:	CALL	INIP1$
+	MOV	#STAPOS,R0
+	CALL	RS$POS		; НА НАЧАЛО OBJ - ФАЙЛА
+GETLIN:
+	CALL	RD$OBJ
+
+	MOV	#CURLIN,R2
+	MOV	RLDLIN,R1
+	MOV	(R1)+,R0	; ТИП ЗАПИСИ .OBJ
+	ASL	R0
+	JMP	@GSDREC-2(R0)	; ОБРАБОТАТЬ ЗАПИСЬ .OBJ
+GSD:
+	MOV	#GSDTXT,R0
+	CALL	MOVTXT
+	CALL	LENOUT
+	CALL	WR$LIN
+	JMP	GETLIN
+EOG:
+	MOV	#EOGTXT,R0
+	CALL	MOVTXT
+	CALL	WR$LIN
+	JMP	GETLIN
+TXT:
+	MOV	#TXTTXT,R0
+	CALL	MOVTXT
+	CALL	LENOUT
+	CALL	WR$LIN
+	JMP	GETLIN
+RLD:
+	MOV	#RLDTXT,R0
+	CALL	MOVTXT
+	CALL	LENOUT
+	CALL	WR$LIN
+
+1$:	MOVB	@R1,R3
+	BIC	#177600,R3
+	MOV	#CURLIN,R2
+	MOV	#TYPTXT,R0
+	CALL	MOVTXT
+	MOV	R3,R0
+	CALL	OCONV
+	CALL	MOVTXT
+	CALL	WR$LIN
+	CALL	INCREL
+	CMP	R1,RLDEND
+	BLO	1$
+	JMP	GETLIN
+EOM:
+	MOV	#EOMTXT,R0
+	CALL	MOVTXT
+	CALL	WR$LIN
+	JMP	START
+
+LENOUT:
+	MOV	#LENTXT,R0
+	CALL	MOVTXT
+	MOV	RLDEND,R0
+	SUB	RLDLIN,R0
+;	SUB	#2,R0
+	CALL	OCONV
+	CALL	MOVTXT
+	RETURN
+
+;
+; INCREL - ПРОДВИНУТЬ RLD НА СЛЕД. ENTRY
+; НА ВХОДЕ: R1 - УКАЗАТЕЛЬ НА ЗАПИСЬ RLD
+;	    R3 - ТИП RLD
+;
+INCREL:
+	CMP	R3,#17		; COMPLEX RELOCATION?
+	BEQ	1$		; ДА, ОБРАБАТЫВАТЬ ОСОБО
+	MOVB	INCRLD-1(R3),R3
+	ADD	R3,R1
+	BR	3$
+1$:	ADD	#2,R1		; ПРОДВИНУТЬСЯ ЗА RLD TYPE И DISP
+2$:	MOVB	(R1)+,R3	; ПРОДВИНУТЬСЯ НА ОПЕРАТОР
+	CMP	R3,#12		; TERMINATOR?
+	BEQ	3$		; ДА - КОНЕЦ
+	BLT	2$		; НЕТ - НА СЛЕД. ОПЕРАТОР
+	CMP	R3,#13		; TERMINATOR?
+	BEQ	3$		; ДА - КОНЕЦ
+	NEG	R3		; FETCH TYPE COMMAND - 16-20
+	ADD	#22,R3		; ПРЕОБР. К ЗНАЧЕНИЮ 2-4
+	ADD	R3,R1		; УКАЗ. НА СЛЕД. ОПЕРАТОР
+	BR	2$		; СЛЕД. ОПЕРАТОР
+3$:	RETURN
+	.PSECT	DECTXT,D,RO
+GSDTXT:	.ASCIZ	/GSD/
+EOGTXT:	.ASCIZ	/ENDGSD/
+TXTTXT:	.ASCIZ	/TXT/
+RLDTXT:	.ASCIZ	/RLD/
+TYPTXT:	.ASCIZ	/TYPE=/
+LENTXT:	.ASCIZ	/ ,LEN=/
+IDENT::	.ASCIZ	/TSTOBJ/
+EOMTXT:	.ASCIZ	/EOM/
+	.EVEN	
+
+	.PSECT	DECDAT,D
+	.NLIST	BEX
+GSDREC: .WORD	GSD,EOG,TXT,RLD,GETLIN,EOM
+
+
+	.END	START

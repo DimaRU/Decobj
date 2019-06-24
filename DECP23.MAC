@@ -1,0 +1,182 @@
+.INCLUDE /DECDFN/
+.MODULE DECP23,RELEASE=V09,VERSION=09,COMMENT=<ДЕКОДИРОВАНИЕ TXT/RLD>
+............................................................
+;
+; * PASS 2,3 - ОБРАБОТКА ЗАПИСЕЙ TXT/RLD *
+;
+............................................................
+PASS23::
+	MOV	#STAPOS,R0	; УСТАНОВИТЬСЯ НА НАЧАЛО ФАЙЛА
+	CALL	RS$POS
+	CLR	@RLDLIN
+	CALL	DECTXT		; ДЕКОДИРОВАТЬ ТЕКСТ
+	CMP	D.PASS,#3
+	BEQ	EOM
+	JMP	END
+
+; ПРОВЕРКА ОКОНЧАНИЯ СЕКЦИЙ
+
+EOM:
+	MOV	#1,R5		; НАЧАЛО С ПЕРВОЙ СЕКЦИИ
+	MOV	#2,R4		; ИНДЕКС
+
+1$:	CMP	PSLC(R4),PSLEN(R4)
+	BNE	3$		; НАДО ДОВЫВОДИТЬ
+
+2$:	TST	GLBPN1(R4)
+	BNE	3$
+	TST	LSPN1(R4)
+	BNE	3$
+	TST	LLPN1(R4)
+	BEQ	7$
+
+3$:	CMP	R5,CURPS	; ПОСЛЕДНЯЯ?
+	BEQ	4$		; НЕ ВЫВОДИТЬ ИМЯ
+	MOV	R5,R1
+	DEC	R1
+	ASL	R1
+	ASL	R1
+	ADD	#PSNAME,R1	; НА ИМЯ
+	CALL	PUTPS
+4$:	MOV	R5,CURPS
+	MOV	PSLC(R4),CURLC
+	MOV	PSLEN(R4),R0	; ВЫЧИСЛИТЬ СМЕЩЕНИЕ
+	CMP	PSLC(R4),R0
+	BEQ	5$
+	CALL	MODLC		; МОДИФИЦИРОВАТЬ УКАЗАТЕЛЬ
+
+5$:	TST	GLBPN1(R4)
+	BNE	6$
+	TST	LSPN1(R4)
+	BNE	6$
+	TST	LLPN1(R4)
+	BEQ	7$
+6$:	CALL	BEGLIN
+	CLR	NXTLC
+	MOV	PSLC(R4),CURLC
+	CALL	PUT$LIN
+
+7$:	ADD	#2,R4
+	INC	R5
+	CMP	R5,PSECTS
+	BLE	1$
+
+END:	MOV	#CURLIN,R2
+	MOV	#DSLSB,R0
+	CALL	MOVTXT		; ВЫВЕСТИ
+	CALL	OUT$LIN
+
+ENDPRT::
+	CALL	BEGLIN
+	MOV	#".E,(R2)+	; ВЫВЕСТИ '.END'
+	MOV	#"ND,(R2)+
+	MOV	#XFR,R0 	; СТАРТОВЫЙ АДРЕС
+	BIT	#1,4(R0)	; НЕЧЕТНОЕ СМЕЩЕНИЕ?
+	BNE	1$		; НЕТ
+	MOV	4(R0),R3	; СМЕЩЕНИЕ
+	CALL	GETPS		; ПОЛУЧИТЬ НОМЕР СЕКЦИИ
+	MOVB	#11,(R2)+	; ВСТАВИТЬ ТАБУЛЯЦИЮ
+	CALL	PUTLS		; ВСТАВИТЬ ЛОКАЛЬНЫЙ СИМВОЛ
+1$:	CALLR	OUT$LIN 	; ВЫВЕСТИ СТРОКУ
+
+;
+; PUT$LIN - ВЫХОДНАЯ ОБРАБОТКА СТРОКИ
+;
+PUT$LIN::
+	CMP	D.PASS,#2	; ВТОРОЙ ПРОХОД?
+	BEQ	1$		; НИЧЕГО НЕ ДЕЛАТЬ
+	TST	BRKFLG		; ВКЛЮЧЕН ДИАЛОГ?
+	BEQ	2$		; НЕТ
+	TST	CURBRK		; ЕСТЬ ВЫВОД НА ТЕРМИНАЛ?
+	BMI	1$		; НЕТ
+2$:	CALL	INSLAB		; ПРОСТАВИТЬ МЕТКИ
+1$:	RETURN
+;
+; OUT$LIN - ВЫВОД В ВЫХ. ФАЙЛ
+;
+OUT$LIN::
+	CMP	D.PASS,#2
+	BEQ	1$
+	TST	BRKFLG		; ВКЛЮЧЕН ДИАЛОГ?
+	BEQ	2$		; НЕТ
+	TST	CURBRK		; ЕСТЬ ВЫВОД НА ТЕРМИНАЛ?
+	BMI	1$		; НЕТ
+2$:	CALL	WR$LIN
+1$:	RETURN
+............................................................
+;
+; ВЫВЕСТИ ИМЯ СЕКЦИИ
+; ВХОД: (R1) - .RAD50 ИМЯ СЕКЦИИ
+; ВЫХОД: (R2) - .PSECT NAME
+;
+............................................................
+PUTPS::
+	CALL	BEGLIN
+	CMP	(R1),#<^R. A>
+	BNE	1$
+	CMP	2(R1),#<^RBS.>
+	BNE	1$
+	MOV	#".A,(R2)+		; СЕКЦИЮ . ABS. ВЫВОДИМ КАК .ASECT
+	MOV	#"SE,(R2)+
+	MOV	#"CT,(R2)+
+	BR	2$
+
+1$:	MOV	#PSTXT,R0
+	CALL	MOVTXT
+	MOV	R2,R0
+	CALL	R50ASC		; ПРЕОБРАЗОВАТЬ В ASCII
+	MOV	R0,R2		; ОБНОВИТЬ УКАЗАТЕЛЬ
+
+	CALL	DELSP
+
+2$:	CALL	OUT$LIN
+	RETURN
+............................................................
+;
+; П/П ПОИСКА МНЕМОНКИ ИНСТРУКЦИИ В ТАБЛИЦАХ
+; ВХОД : R0 - > СТРОКА ОБРАЗЦА В ASCII, 6 СИМВОЛОВ
+............................................................
+SRHINS::
+	JSR	R1,$SAVE5
+	MOV	R0,R1
+	ADD	#6,R1
+1$:	CMPB	-(R1),#40
+	BNE	2$
+	MOVB	#200,@R1	; ДЛЯ СОВМЕСТИМОСТИ С TABLX, ЗАМЕН. 40 НА 200
+	BR	1$
+2$:	MOV	#TABL1,R1
+	CALL	SRH		; ВЫХОДИТ САМА
+	MOV	#TABL2,R1
+	CALL	SRH		; ВЫХОДИТ САМА
+	MOV	#FPUTBL,R1
+	CALL	SRH		; ВЫХОДИТ САМА
+	MOV	#CISTBL,R1
+	CALL	SRH		; ВЫХОДИТ САМА
+	SEC
+	RETURN
+SRH:
+	MOV	(R1)+,R5	; ЧИСЛО ЭЛЕМЕНТОВ В ТАБЛИЦЕ
+3$:	MOV	R1,R4		; ОБРАЗЕЦ
+	ADD	#10,R4
+	MOV	R0,R3		; МОДЕЛЬ
+	CMP	(R4)+,(R3)+
+	BNE	1$
+	CMP	(R4)+,(R3)+
+	BNE	1$
+	CMP	(R4)+,(R3)+
+	BEQ	2$		; ВСЕ СОВПАЛО
+1$:	ADD	#14.,R1
+	SOB	R5,3$
+	RETURN			; В ЭТОЙ ТАБЛИЦЕ НЕ НАШЛИ
+2$:	MOV	R1,R0		; АДРЕС ЭЛЕМЕНТА В ТАБЛИЦЕ		
+	TST	(SP)+		; АДРЕС ВОЗВРАТА В SRHINS,CLC
+	RETURN
+
+	.END
+А ЗАПИСЬ RLD
+;
+............................................................
+RLDPS:
+	MOV	R1,-(SP)
+	TST	(R1)+
+	MOV	R1,R0

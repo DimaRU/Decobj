@@ -1,0 +1,171 @@
+.INCLUDE /DECDFN/
+.MODULE DECSET,RELEASE=V09,VERSION=08,COMMENT=<ИНИЦИАЛИЗАЦИЯ ДАННЫХ>
+
+;
+; DECSET - П/П УСТАНОВКИ УКАЗАТЕЛЕЙ И ДАННЫХ DECOBJ
+;
+; *************************************************************
+;
+; INIT$ - НАЧАЛЬНАЯ ИНИЦИАЛИЗАЦИЯ ДАННЫХ ДЛЯ DECOBJ
+;
+;
+INIT$::
+	BIC	#BAS$,I.RET	; ВЫКЛЮЧИТЬ RETURN,CALL
+	BIC	#BAS$,I.CALL
+	MOV	#TABLLO,R0	; ИНИЦ. УКАЗАТЕЛИ
+1$:	CLR	(R0)+
+	CMP	R0,#TABLHI
+	BLO	1$
+	MOV	#1,XFR+4	; ИНИЦ. СТАРТОВЫЙ АДРЕС
+	RETURN
+;
+; *************************************************************
+;
+; INIP1$ - ИНИЦИАЛИЗАЦИЯ ДАННЫХ ДЛЯ ПЕРВОГО ПРОХОДА
+;
+INIP1$::
+	MOV	#200,R5 	; ОТВЕДЕНИЕ ПАМЯТИ ПОД БЛОКИ TXT,RLD,NXT
+	CALL	GTMEM2
+	MOV	R5,TXTLIN
+
+	MOV	#200,R5
+	CALL	GTMEM2
+	MOV	R5,RLDLIN
+
+	MOV	#200,R5
+	CALL	GTMEM2
+	MOV	R5,NXTLIN
+	MOV	PARSWT,PARSAV
+	RETURN
+;
+; *************************************************************
+;
+; INIP2$ - ИНИЦИАЛИЗАЦИЯ ДАННЫХ ДЛЯ ВТОРОГО ПРОХОДА
+;
+INIP2$::
+	MOV	PARSAV,PARSWT
+	CLR	CURPS		; ИНИЦИАЛИЗИРОВАТЬ CURPS
+	CLR	CMDLCN
+	TST	BRKFLG		; ВКЛЮЧЕН ДИАЛОГ?
+	BEQ	3$		; НЕТ, НЕ НАДО ОТВОДИТЬ ПАМЯТЬ ПОД ОТМЕТКИ
+
+	MOV	MAX.B,R5
+.IF	DF,EIS$I
+	MUL	#10.,R5
+.IFF
+	ASL	R5		;*2
+	ASL	R5		;*4
+	ADD	MAX.B,R5	;*5
+	ASL	R5		;*5*2
+.ENDC
+	CALL	GTMEM2		; ОТВЕДЕНИЕ ПАМЯТИ ПОД SV.BLK
+	MOV	#SV.BLK,R0
+	MOV	R5,(R0)+	; BEG
+	MOV	R5,(R0)+	; CUR
+	MOV	CURMEM,R5
+	SUB	#5*2,R5
+	MOV	R5,(R0)+	; END
+	CLR	(R0)+		; CNT
+	MOV	MAX.B,(R0)+	; LEN
+
+	MOV	MAX.I,R5
+.IF	DF,EIS$I
+	MUL	#10.,R5
+.IFF
+	ASL	R5		;*2
+	ASL	R5		;*4
+	ADD	MAX.I,R5	;*5
+	ASL	R5		;*5*2
+.ENDC
+	CALL	GTMEM2		; ОТВЕДЕНИЕ ПАМЯТИ ПОД SV.INS
+	MOV	#SV.INS,R0
+	MOV	R5,(R0)+	; BEG
+	MOV	R5,(R0)+	; CUR
+	MOV	CURMEM,R5
+	SUB	#5*2,R5
+	MOV	R5,(R0)+	; END
+	CLR	(R0)+		; CNT
+	MOV	MAX.I,(R0)+	; LEN
+
+	MOV	#MCRLEN,R5
+	CALL	GTMEM2		; ОТВЕДЕНИЕ ПАМЯТИ ПОД MACRO
+	MOV	R5,MCRBUF
+	MOV	R5,MCREND
+	MOV	CURMEM,MCBEND
+
+3$:	MOV	#'/,DELIM	; ПО УМОЛЧАНИЮ - '/'
+	MOV	#12,ENDCHR	; ПО УМОЛЧАНИЮ - LF
+	MOV	#33,STACHR	; ПО УМОЛЧАНИЮ - ESC
+	MOV	#60.,CHRLIM	; МАХ. КОЛ-ВО СИМВОЛОВ В СТРОКЕ ASCII
+	BIT	#L.CAL,PARSWT	; ДЕКОДИРОВАТЬ RETURN,CALL?
+	BEQ	2$		; НЕТ
+	BIS	#BAS$,I.RET	; ВКЛЮЧИТЬ RETURN,CALL
+	BIS	#BAS$,I.CALL
+
+2$:	MOV	#TXTPNT+2,R0
+	MOV	#TXTPN1+2,R1
+	MOV	#INICMD+2,R2
+	MOV	#PSCMD+2,R3
+	MOV	PSECTS,R4
+1$:	MOV	(R0)+,(R1)+
+	MOV	(R2)+,(R3)+
+	SOB	R4,1$
+	MOV	M.C.SV,MODCMD
+	MOV	S.C.SV,SETCMD
+	RETURN
+;
+; *************************************************************
+;
+; INIP3$ - ИНИЦИАЛИЗАЦИЯ ДАННЫХ ДЛЯ ТРЕТЬЕГО ПРОХОДА
+;
+INIP3$::
+	MOV	#1,CURBRK
+	MOV	#INICMD+2,R2
+	MOV	#PSCMD+2,R3
+	MOV	#PSLC+2,R4
+	MOV	PSECTS,R5
+1$:	MOV	(R2)+,(R3)+
+	CLR	(R4)+
+	SOB	R5,1$
+
+	MOV	#GLBPNT+2,R0	; СКОПИРОВАТЬ УКАЗАТЕЛИ
+	MOV	#GLBPN1+2,R1
+	MOV	#LLPNT+2,R2
+	MOV	#LLPN1+2,R3
+	MOV	#LSPNT+2,R4
+	MOV	#LSPN1+2,R5
+	MOV	PSECTS,-(SP)
+2$:	MOV	(R0)+,(R1)+
+	MOV	(R2)+,(R3)+
+	MOV	(R4)+,(R5)+
+	DEC	(SP)
+	BNE	2$
+	TST	(SP)+
+
+	MOV	#TXTPNT+2,R0
+	MOV	#TXTPN1+2,R1
+	MOV	PSECTS,R5
+3$:	MOV	(R0)+,(R1)+
+	SOB	R5,3$
+	CLR	CURPS		; ИНИЦИАЛИЗИРОВАТЬ CURPS
+	CLR	CMDLCN
+	CLR	PNTLCN
+;	MOV	SV.BLK+2,SV.BLK ; POS
+;	MOV	SV.INS+2,SV.INS ; POS
+	MOV	M.C.SV,MODCMD
+	MOV	S.C.SV,SETCMD
+	CLR	BLKB1
+	MOV	#-1,MARKLC
+	MOV	#'/,DELIM	; ПО УМОЛЧАНИЮ - '/'
+	MOV	#12,ENDCHR	; ПО УМОЛЧАНИЮ - LF
+	MOV	#33,STACHR	; ПО УМОЛЧАНИЮ - ESC
+	MOV	#60.,CHRLIM	; МАХ. КОЛ-ВО СИМВОЛОВ В СТРОКЕ ASCII
+	MOV	PARSAV,PARSWT
+	CLR	R.SUBR
+	CLR	C.SUBR
+	CLR	R.BASE
+	CLR	R.BASE+2
+	MOV	#CP.TRN,R.BASE+4
+	RETURN
+
+	.END
